@@ -14,7 +14,7 @@ const { OverlayWindow } = require('./windows/overlay-window');
 const { createBackdropWindow } = require('./windows/backdrop-window');
 const { createSettingsWindow } = require('./windows/settings-window');
 const { scanFolder } = require('./services/folder');
-const { payloadForItem } = require('./services/icons');
+const { payloadForItem, prefetchShortcutIcons } = require('./services/icons');
 const { moveIntoFolder } = require('./services/fsops');
 const { sanitizeSettings, settingsSnapshot } = require('./services/settings');
 const {
@@ -97,8 +97,12 @@ async function loadFolderState(tileId) {
   const state = folderStates.get(tileId) || {};
   state.data = data;
   folderStates.set(tileId, state);
-  if (data.error) log('scan folder error:', tileId, data.error, folder);
-  else log('folder scanned:', tileId, data.name, data.items.length, 'items');
+  if (data.error) {
+    log('scan folder error:', tileId, data.error, folder);
+  } else {
+    log('folder scanned:', tileId, data.name, data.items.length, 'items');
+    prefetchShortcutIcons(data.items);
+  }
   return data;
 }
 
@@ -787,3 +791,4 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+

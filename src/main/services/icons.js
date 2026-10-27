@@ -1,8 +1,15 @@
 'use strict';
 
-// 图标/缩略图：文件夹与图片/视频优先用系统缩略图（256px，清晰），其余退回 32px 系统图标
+// 图标/缩略图：文件夹与图片/视频优先用系统缩略图（128px，清晰），
+// 快捷方式/可执行文件取真实目标图标；其余退回 32px 系统图标
 const path = require('path');
 const { app, nativeImage } = require('electron');
+const {
+  requestShortcutIcon,
+  prefetchShortcutIcons,
+  clearShortcutIconCache,
+  isShortcutFile
+} = require('./shortcut-icons');
 
 const MEMORY_LIMIT = 150;
 const THUMBNAIL_SIZE = { width: 128, height: 128 };
@@ -62,7 +69,17 @@ async function payloadForItem(item) {
   const ext = path.extname(item.path).toLowerCase();
   let payload = null;
 
-  // 文件夹 / 图片 / 视频：优先缩略图（文件夹缩略图 256px 比 32px 图标清晰得多）
+  // .lnk / .exe：Electron 的 getFileIcon 只会给统一占位图标，这里解析真实目标图标
+  if (!item.isDir && isShortcutFile(item.path)) {
+    const dataUrl = await requestShortcutIcon(item.path, item.mtimeMs);
+    if (dataUrl) {
+      payload = { dataUrl, kind: 'icon' };
+      remember(key, payload);
+      return payload;
+    }
+  }
+
+  // 文件夹 / 图片 / 视频：优先缩略图（文件夹缩略图比 32px 图标清晰得多）
   if (item.isDir || THUMBNAIL_EXT.has(ext)) {
     const dataUrl = await thumbnailFor(item.path);
     if (dataUrl) payload = { dataUrl, kind: 'thumb' };
@@ -79,7 +96,8 @@ async function payloadForItem(item) {
 
 function clearCache() {
   cache.clear();
+  clearShortcutIconCache();
 }
 
-module.exports = { payloadForItem, clearCache };
+module.exports = { payloadForItem, clearCache, prefetchShortcutIcons };
 
