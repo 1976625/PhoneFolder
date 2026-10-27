@@ -8,62 +8,219 @@ const eyebrowEl = document.getElementById('eyebrow');
 const gridEl = document.getElementById('grid');
 const dotsEl = document.getElementById('dots');
 
-const PER_PAGE = 9;
 const GROW_SCALE = 0.19;
 const OPEN_MS = 380;
 const CLOSE_MS = 240;
+const GLYPH_BY_EXT = {
+  md: '📄', txt: '📄', doc: '📝', docx: '📝', pdf: '📕',
+  xls: '📊', xlsx: '📊', csv: '📊', ppt: '📽️', pptx: '📽️',
+  zip: '🗜️', rar: '🗜️', '7z': '🗜️', exe: '⚙️', msi: '⚙️', lnk: '🔗',
+  jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', webp: '🖼️', bmp: '🖼️', svg: '🖼️',
+  mp4: '🎬', mkv: '🎬', mov: '🎬', avi: '🎬', webm: '🎬',
+  mp3: '🎵', wav: '🎵', flac: '🎵'
+};
 
 let isOpen = false;
 let isClosing = false;
 let closeTimer = null;
+let page = 0;
+let items = [];
+let pageSize = 9;
+let total = 0;
+let error = null;
+let errorMessage = null;
+let truncated = false;
+let tileRect = null;
+let openedAt = 0;
+const iconCache = new Map(); // path -> { dataUrl, kind }
 
 function iconBackground(hue) {
   const h = Number(hue) || 220;
-  return `linear-gradient(145deg, hsl(${h} 78% 62%), hsl(${h + 28} 76% 46%))`;
+  return `linear-gradient(145deg, hsl(${h} 70% 56% / 0.92), hsl(${h + 30} 72% 40% / 0.95))`;
 }
 
-function renderItems(items) {
-  gridEl.textContent = '';
-  (items || []).forEach((item, index) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'item';
-    btn.style.animationDelay = `${index * 18}ms`;
-
-    const icon = document.createElement('span');
-    icon.className = 'icon';
-    icon.style.background = iconBackground(item.hue);
-    icon.textContent = item.emoji || '';
-
-    const name = document.createElement('span');
-    name.className = 'name';
-    name.textContent = item.name || '';
-
-    btn.append(icon, name);
-    btn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      icon.animate(
-        [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
-        { duration: 240, easing: 'ease-out' }
-      );
-    });
-    gridEl.appendChild(btn);
-  });
+function hueFromName(name) {
+  let hash = 0;
+  const text = String(name || '');
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 360;
+  }
+  return hash;
 }
 
-function renderDots(total) {
-  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+function extOf(name) {
+  const idx = String(name || '').lastIndexOf('.');
+  return idx > 0 ? String(name).slice(idx + 1).toLowerCase() : '';
+}
+
+function glyphFor(item) {
+  if (item.isDir) return '📁';
+  return GLYPH_BY_EXT[extOf(item.name)] || '📄';
+}
+
+function pagesCount() {
+  return Math.max(1, Math.ceil(items.length / pageSize));
+}
+
+function clampPage() {
+  const last = pagesCount() - 1;
+  if (page > last) page = last;
+  if (page < 0) page = 0;
+}
+
+function renderHead(folderName) {
+  const pages = pagesCount();
+  let eyebrow = '';
+  if (error) {
+    eyebrow = '读取失败';
+  } else if (pages > 1) {
+    eyebrow = `${items.length + (truncated ? '+' : '')} 项 · 第 ${page + 1}/${pages} 页`;
+  } else {
+    eyebrow = `${items.length}${truncated ? '+' : ''} 项`;
+  }
+  eyebrowEl.textContent = eyebrow;
+  titleEl.textContent = folderName || '文件夹';
+}
+
+function renderDots() {
   dotsEl.textContent = '';
+  const pages = pagesCount();
   if (pages <= 1) {
     dotsEl.classList.add('is-hidden');
     return;
   }
   dotsEl.classList.remove('is-hidden');
   for (let i = 0; i < pages; i += 1) {
-    const dot = document.createElement('span');
-    dot.className = i === 0 ? 'dot active' : 'dot';
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = i === page ? 'dot active' : 'dot';
+    dot.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (i !== page) {
+        page = i;
+        renderPage(-1);
+      }
+    });
     dotsEl.appendChild(dot);
   }
+}
+
+function loadIcon(item, iconWrap, glyph) {
+  const cached = iconCache.get(item.path);
+  if (cached) {
+    applyIcon(iconWrap, glyph, cached);
+    return;
+  }
+  window.phoneFolder.getIcon({
+    path: item.path,
+    isDir: item.isDir,
+    mtimeMs: item.mtimeMs
+  }).then((payload) => {
+    if (!payload || !payload.dataUrl) return;
+    iconCache.set(item.path, payload);
+    if (iconWrap.isConnected) applyIcon(iconWrap, glyph, payload);
+  }).catch(() => { /* ignore */ });
+}
+
+function applyIcon(iconWrap, glyph, payload) {
+  iconWrap.classList.add('has-image', payload.kind === 'thumb' ? 'kind-thumb' : 'kind-icon');
+  // 注意：前面用 inline 的 background 简写画了渐变占位，简写会把 background-size 重置成 auto，
+  // 这里必须把 size/position/repeat 也用 inline 明确写回，否则缩略图会被裁切成局部放大。
+  iconWrap.style.background = 'transparent';
+  iconWrap.style.backgroundImage = `url("${payload.dataUrl}")`;
+  iconWrap.style.backgroundSize = payload.kind === 'thumb' ? 'cover' : '44px 44px';
+  iconWrap.style.backgroundPosition = 'center';
+  iconWrap.style.backgroundRepeat = 'no-repeat';
+  glyph.remove();
+}
+
+function itemEl(item, index) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'item';
+  btn.style.animationDelay = `${index * 18}ms`;
+
+  const icon = document.createElement('span');
+  icon.className = 'icon';
+  icon.style.background = iconBackground(hueFromName(item.name));
+
+  const glyph = document.createElement('span');
+  glyph.className = 'glyph';
+  glyph.textContent = glyphFor(item);
+  icon.appendChild(glyph);
+
+  const name = document.createElement('span');
+  name.className = 'name';
+  name.textContent = item.name;
+
+  btn.append(icon, name);
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    icon.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
+      { duration: 220, easing: 'ease-out' }
+    );
+    window.phoneFolder.openItem(item.path);
+    closeOverlay();
+  });
+  btn.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    window.phoneFolder.showItemMenu(item.path);
+  });
+
+  loadIcon(item, icon, glyph);
+  return btn;
+}
+
+function renderMessage(kind) {
+  const box = document.createElement('div');
+  box.className = 'placeholder';
+  const icon = document.createElement('div');
+  icon.className = 'placeholder-icon';
+  icon.textContent = kind === 'error' ? '⚠️' : '📂';
+  const text = document.createElement('div');
+  text.className = 'placeholder-text';
+  text.textContent = kind === 'error' ? (errorMessage || '文件夹读取失败') : '这个文件夹是空的';
+  const hint = document.createElement('div');
+  hint.className = 'placeholder-hint';
+  hint.textContent = kind === 'error' ? '右键瓦片 → 重新扫描' : '把文件移进来后会显示在这里';
+  box.append(icon, text, hint);
+  gridEl.appendChild(box);
+}
+
+function renderPage() {
+  gridEl.textContent = '';
+  gridEl.classList.remove('is-empty', 'is-error', 'items-in');
+  clampPage();
+
+  if (error) {
+    gridEl.classList.add('is-error');
+    renderMessage('error');
+  } else if (items.length === 0) {
+    gridEl.classList.add('is-empty');
+    renderMessage('empty');
+  } else {
+    const start = page * pageSize;
+    items.slice(start, start + pageSize).forEach((item, index) => {
+      gridEl.appendChild(itemEl(item, index));
+    });
+  }
+
+  renderHead(folderNameRef);
+  renderDots();
+  void gridEl.offsetWidth;
+  gridEl.classList.add('items-in');
+}
+
+let folderNameRef = '';
+
+function changePage(delta) {
+  if (error || items.length === 0) return;
+  const next = page + delta;
+  if (next < 0 || next >= pagesCount()) return;
+  page = next;
+  renderPage();
 }
 
 function centerPanel() {
@@ -75,10 +232,19 @@ function centerPanel() {
   const top = Math.round((window.innerHeight - rect.height) / 2);
   panelEl.style.left = `${left}px`;
   panelEl.style.top = `${top}px`;
-  window.phoneFolder.log(
-    `centerPanel inner=${window.innerWidth}x${window.innerHeight} rect=${Math.round(rect.width)}x${Math.round(rect.height)} left=${left} top=${top}`
-  );
   return { left, top };
+}
+
+function applyPayload(data) {
+  if (!data) return;
+  items = Array.isArray(data.items) ? data.items : [];
+  total = Number(data.total) || items.length;
+  pageSize = Number(data.pageSize) || 9;
+  error = data.error || null;
+  errorMessage = data.errorMessage || null;
+  truncated = Boolean(data.truncated);
+  folderNameRef = data.folderName || '文件夹';
+  page = 0;
 }
 
 function openOverlay(data) {
@@ -89,12 +255,14 @@ function openOverlay(data) {
   }
   isOpen = true;
   isClosing = false;
-
-  const items = data.items || [];
-  titleEl.textContent = data.folderName || '文件夹';
-  eyebrowEl.textContent = `文件夹 · ${items.length} 项`;
-  renderItems(items);
-  renderDots(items.length);
+  openedAt = data.openedAt || Date.now();
+  tileRect = data.tileRect || {
+    x: Math.round(window.innerWidth / 2) - 42,
+    y: Math.round(window.innerHeight / 2) - 42,
+    width: 84,
+    height: 84
+  };
+  applyPayload(data);
 
   if (data.backgroundImage) {
     bgEl.style.backgroundImage = `url("${data.backgroundImage}")`;
@@ -103,15 +271,10 @@ function openOverlay(data) {
     bgEl.classList.remove('on');
   }
 
-  const tile = data.tileRect || {
-    x: Math.round(window.innerWidth / 2) - 42,
-    y: Math.round(window.innerHeight / 2) - 42,
-    width: 84,
-    height: 84
-  };
+  renderPage();
   const panel = centerPanel();
-  const originX = tile.x + tile.width / 2 - panel.left;
-  const originY = tile.y + tile.height / 2 - panel.top;
+  const originX = tileRect.x + tileRect.width / 2 - panel.left;
+  const originY = tileRect.y + tileRect.height / 2 - panel.top;
   panelEl.style.transformOrigin = `${originX}px ${originY}px`;
 
   panelEl.classList.remove('items-in');
@@ -130,13 +293,15 @@ function openOverlay(data) {
       dimEl.style.transition = 'opacity 280ms ease-out';
       dimEl.style.opacity = '1';
       panelEl.classList.add('items-in');
-      if (data.openedAt) {
-        window.phoneFolder.log(
-          `overlay first frame +${Date.now() - data.openedAt}ms / panel ${panelEl.style.transform} opacity ${panelEl.style.opacity}`
-        );
-      }
+      window.phoneFolder.log(`overlay first frame +${Date.now() - openedAt}ms / ${items.length} items`);
     });
   });
+}
+
+function onRefresh(data) {
+  if (!isOpen || isClosing) return;
+  applyPayload(data);
+  renderPage();
 }
 
 function closeOverlay() {
@@ -160,12 +325,36 @@ function closeOverlay() {
 }
 
 window.phoneFolder.onOverlayOpen(openOverlay);
+window.phoneFolder.onOverlayRefresh(onRefresh);
 window.phoneFolder.onOverlayClose(closeOverlay);
 
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closeOverlay();
+  if (event.key === 'ArrowLeft') changePage(-1);
+  if (event.key === 'ArrowRight') changePage(1);
+});
+
+window.addEventListener('wheel', (event) => {
+  if (!isOpen) return;
+  if (Math.abs(event.deltaY) < 8 && Math.abs(event.deltaX) < 8) return;
+  event.preventDefault();
+  changePage(event.deltaY > 0 || event.deltaX > 0 ? 1 : -1);
+}, { passive: false });
+
+let swipeStartX = null;
+window.addEventListener('pointerdown', (event) => {
+  if (!isOpen || event.button !== 0) return;
+  swipeStartX = event.clientX;
+});
+window.addEventListener('pointerup', (event) => {
+  if (!isOpen || swipeStartX === null) return;
+  const dx = event.clientX - swipeStartX;
+  if (Math.abs(dx) > 42) changePage(dx < 0 ? 1 : -1);
+  swipeStartX = null;
 });
 
 document.addEventListener('mousedown', (event) => {
   if (!panelEl.contains(event.target)) closeOverlay();
 });
+
+

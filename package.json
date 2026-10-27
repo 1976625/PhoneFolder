@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "shot": "electron . --shot"
+    "shot": "electron . --shot",
+    "test": "node tests/unit/run.js"
   },
   "devDependencies": {
     "electron": "43.3.0"
@@ -20,4 +21,5 @@
     ]
   }
 }
+
 
