@@ -1,0 +1,23 @@
+{
+  "name": "phone-folder",
+  "version": "0.1.0",
+  "description": "PhoneFolder - phone-style folder tiles for the Windows desktop",
+  "main": "src/main/main.js",
+  "author": "rabbit",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "shot": "electron . --shot"
+  },
+  "devDependencies": {
+    "electron": "43.3.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron"
+    ]
+  }
+}
+
