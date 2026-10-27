@@ -6,7 +6,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 交互对标付费软件 DeskFolders，本项目免费自研。定位：不替代资源管理器，只在桌面上加一层「文件夹入口 + 展开层」。
 
-**当前版本：v0.6.2**（便携版已产出）。
+**当前版本：v0.6.3**（便携版已产出）。
 
 ## 当前进度
 
@@ -18,7 +18,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 | P3 拖放 | ✅ 完成 | 拖入移入（重名 (n)、跨盘回退、跳过已在内）、单文件拖出、拖入高亮/toast |
 | P4 系统集成 | ✅ 完成 | 托盘、设置页、开机自启、单实例、多瓦片（≤6） |
 | P5 打磨打包 | ✅ 完成 | 性能实测、内存优化、electron-builder 便携版 |
-| v0.6 行为修正 | ✅ 完成 | 默认空瓦片 + 隐藏收纳文件夹 + 从桌面拖入收纳（旧配置自动迁移）；v0.6.1/0.6.2 空瓦片去图标、边缘改为与展开面板一致的实线玻璃边 |
+| v0.6 行为修正 | ✅ 完成 | 默认空瓦片 + 隐藏收纳文件夹 + 从桌面拖入收纳（旧配置自动迁移）；v0.6.1/0.6.2 空瓦片去图标、边缘改为与展开面板一致的实线玻璃边；v0.6.3 修复二次打开不居中 |
 
 - 开发计划：[docs/开发计划.md](docs/开发计划.md)
 - 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md)
@@ -27,10 +27,10 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 | 产物 | 大小 | 用法 |
 |---|---|---|
-| `release/PhoneFolder-0.6.2-portable.exe` | 93.5 MB | **双击即用**（自解压到临时目录运行） |
-| `release/PhoneFolder-0.6.2-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
+| `release/PhoneFolder-0.6.3-portable.exe` | 93.5 MB | **双击即用**（自解压到临时目录运行） |
+| `release/PhoneFolder-0.6.3-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
 
-- SHA-256 前 16 位：portable `DAE345C40FBEB50B` · zip `BF662630B58A6AAC`
+- SHA-256 前 16 位：portable `CB807FE8AC78F716` · zip `982804F1D3E22A57`
 - 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
 - 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
 - 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
@@ -86,6 +86,7 @@ pnpm dist            # zip + portable，输出到 release/
 pnpm test                        # 排序/过滤/移入/设置校验/配置迁移单测（10 项）
 node scripts/e2e-drop.js         # E2E：桌面文件拖入瓦片（CDP 调真实 IPC）
 node scripts/e2e-settings.js     # E2E：多瓦片 + 自启注册表 + 设置窗口
+node scripts/diag-center.js      # 回归：连续打开浮层是否始终居中
 ```
 
 ## 配置
@@ -156,4 +157,5 @@ D:\deskTop\phoneS\
 - 收纳是**移动**语义：文件从桌面移进隐藏文件夹（仍在本地，可打开/移出）
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件
 - 多显示器未适配；瓦片大小是全局设置
+
 

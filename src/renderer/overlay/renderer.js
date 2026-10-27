@@ -263,9 +263,13 @@ function changePage(delta) {
 }
 
 function centerPanel() {
-  // 上一次关闭后 panel 还留着 scale 变换，先清掉再量尺寸，否则量到的是缩小后的矩形
+  // 关键：上一次关闭动画的 transition 还在，直接改 transform 会被当成新的过渡，
+  // getBoundingClientRect() 量到的是「过渡起点」（scale 0.19 的矩形）→ 二次打开不居中。
+  // 必须先清掉 transition，再改 transform，并强制一次布局后才测量。
+  panelEl.style.transition = 'none';
   panelEl.style.transform = 'none';
   panelEl.style.opacity = '0';
+  void panelEl.offsetWidth;
   const rect = panelEl.getBoundingClientRect();
   const left = Math.round((window.innerWidth - rect.width) / 2);
   const top = Math.round((window.innerHeight - rect.height) / 2);
