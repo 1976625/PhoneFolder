@@ -212,16 +212,19 @@ function itemEl(item, index) {
 function renderMessage(kind) {
   const box = document.createElement('div');
   box.className = 'placeholder';
-  const icon = document.createElement('div');
-  icon.className = 'placeholder-icon';
-  icon.textContent = kind === 'error' ? '⚠️' : '📂';
+  if (kind === 'error') {
+    const icon = document.createElement('div');
+    icon.className = 'placeholder-icon';
+    icon.textContent = '⚠️';
+    box.appendChild(icon);
+  }
   const text = document.createElement('div');
   text.className = 'placeholder-text';
   text.textContent = kind === 'error' ? (errorMessage || '文件夹读取失败') : '这个瓦片还是空的';
   const hint = document.createElement('div');
   hint.className = 'placeholder-hint';
   hint.textContent = kind === 'error' ? '右键瓦片 → 重新扫描' : '把桌面上的文件 / 文件夹拖到瓦片上或这里';
-  box.append(icon, text, hint);
+  box.append(text, hint);
   gridEl.appendChild(box);
 }
 
