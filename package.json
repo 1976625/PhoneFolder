@@ -1,6 +1,6 @@
 {
   "name": "phone-folder",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "description": "PhoneFolder - phone-style folder tiles for the Windows desktop",
   "main": "src/main/main.js",
   "author": "rabbit",
@@ -10,10 +10,13 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "shot": "electron . --shot",
-    "test": "node tests/unit/run.js"
+    "test": "node tests/unit/run.js",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
   },
   "devDependencies": {
-    "electron": "43.3.0"
+    "electron": "43.3.0",
+    "electron-builder": "^26.18.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -21,5 +24,3 @@
     ]
   }
 }
-
-

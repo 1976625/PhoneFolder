@@ -1,0 +1,40 @@
+appId: local.phonefolder
+productName: PhoneFolder
+copyright: Copyright © 2026 rabbit
+
+directories:
+  output: release
+  buildResources: assets
+
+files:
+  - src/**/*
+  - assets/**/*
+  - package.json
+  - "!**/*.map"
+  - "!**/*.md"
+
+asar: true
+asarUnpack:
+  - assets/icon.ico
+
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/
+
+win:
+  icon: assets/icon.ico
+  target:
+    - target: zip
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: true
+  artifactName: ${productName}-${version}-setup.${ext}

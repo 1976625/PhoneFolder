@@ -36,6 +36,29 @@ let truncated = false;
 let tileRect = null;
 let openedAt = 0;
 const iconCache = new Map(); // path -> { dataUrl, kind }
+const ICON_CACHE_LIMIT = 200;
+
+function rememberIcon(path, payload) {
+  if (iconCache.size >= ICON_CACHE_LIMIT) {
+    iconCache.delete(iconCache.keys().next().value);
+  }
+  iconCache.set(path, payload);
+}
+
+function measurePerf(label) {
+  const start = performance.now();
+  let frames = 0;
+  function tick() {
+    frames += 1;
+    const elapsed = performance.now() - start;
+    if (elapsed < 500) {
+      requestAnimationFrame(tick);
+    } else {
+      window.phoneFolder.log(`perf ${label}: ${frames} frames in ${Math.round(elapsed)}ms (~${(frames / (elapsed / 1000)).toFixed(1)} fps)`);
+    }
+  }
+  requestAnimationFrame(tick);
+}
 
 function iconBackground(hue) {
   const h = Number(hue) || 220;
@@ -120,7 +143,7 @@ function loadIcon(item, iconWrap, glyph) {
     mtimeMs: item.mtimeMs
   }).then((payload) => {
     if (!payload || !payload.dataUrl) return;
-    iconCache.set(item.path, payload);
+    rememberIcon(item.path, payload);
     if (iconWrap.isConnected) applyIcon(iconWrap, glyph, payload);
   }).catch(() => { /* ignore */ });
 }
@@ -316,6 +339,7 @@ function openOverlay(data) {
       dimEl.style.opacity = '1';
       panelEl.classList.add('items-in');
       window.phoneFolder.log(`overlay first frame +${Date.now() - openedAt}ms / ${items.length} items`);
+      if (data.perf) measurePerf('open');
     });
   });
 }

@@ -31,7 +31,15 @@ const isOpenSettings = argv.includes('--open-settings');
 const isStage = isShot || isHold;
 
 const ROOT = path.join(__dirname, '..', '..');
-const SHOT_DIR = path.join(ROOT, 'shots', process.env.PF_SHOT_DIR || '');
+// 开发/打包共用同一个 userData 目录（electron-builder 打包后 app 名会变，显式固定）
+try {
+  app.setPath('userData', path.join(app.getPath('appData'), 'phone-folder'));
+} catch { /* ignore */ }
+const PROCESS_START = Date.now();
+// 打包后 asar 内不可写：截图目录回退到临时目录
+const SHOT_DIR = app.isPackaged
+  ? path.join(app.getPath('temp'), 'phonefolder-shots')
+  : path.join(ROOT, 'shots', process.env.PF_SHOT_DIR || '');
 const ICON_PATH = path.join(ROOT, 'assets', 'icon.ico');
 const PAGE_SIZE = 9;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -138,6 +146,7 @@ function buildOverlayPayload(tile) {
     total: (data && data.total) || 0,
     truncated: Boolean(data && data.truncated),
     pageSize: PAGE_SIZE,
+    perf: process.env.PF_PERF === '1',
     dim: config.overlay.dim,
     blur: config.overlay.blur,
     error: data ? data.error : null,
@@ -366,14 +375,17 @@ function createTray() {
 function applyAutostart() {
   try {
     const openAtLogin = Boolean(config.app && config.app.launchAtLogin);
+    // 便携版（portable）会解压到临时目录运行：自启要指回 portable exe 本身
+    const portableExe = process.env.PORTABLE_EXECUTABLE_FILE;
+    const exePath = portableExe || app.getPath('exe');
     const args = app.isPackaged ? [] : [app.getAppPath()];
     app.setLoginItemSettings({
       openAtLogin,
-      path: app.getPath('exe'),
+      path: exePath,
       args,
       name: 'PhoneFolder'
     });
-    log('autostart:', openAtLogin);
+    log('autostart:', openAtLogin, exePath);
   } catch (err) {
     log('apply autostart failed:', err.message);
   }
@@ -669,6 +681,7 @@ async function runShot(tile) {
   await captureScreen('01-tile.png');
 
   await warmBackground({ force: true });
+  overlayTileId = tile.id;
   const payload = buildOverlayPayload(tile);
   overlay.preparePayload(payload);
   await overlay.open(payload);
@@ -718,6 +731,7 @@ async function bootstrap() {
   await Promise.all(config.tiles.map((tile) => loadFolderState(tile.id)));
   await createAllTileWindows();
   for (const tile of config.tiles) startWatcher(tile.id);
+  log('startup: tile ready in', Date.now() - PROCESS_START, 'ms');
 
   if (isShot) {
     await runShot(config.tiles[0]);

@@ -4,21 +4,34 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 交互对标付费软件 DeskFolders，本项目免费自研。定位：不替代资源管理器，只在桌面上加一层「文件夹入口 + 展开层」。
 
+**当前版本：v0.5.0（MVP 完成）**，已产出便携版，可直接运行。
+
 ## 当前进度
 
 | 阶段 | 状态 | 说明 |
 |---|---|---|
 | P0 脚手架 | ✅ 完成 | pnpm + Electron 43.3.0，main/preload/renderer 分层，`pnpm shot` 截图 |
 | P1 视觉原型 | ✅ 完成 | 瓦片 UI、全屏浮层、壁纸模糊、开合动画 |
-| P2 真实内容 | ✅ 完成 | 真实文件夹扫描、256px 缩略图、3×3 分页、点击打开、右键菜单、fs.watch 刷新、空态/错误态 |
+| P2 真实内容 | ✅ 完成 | 真实文件夹扫描、128px 缩略图、3×3 分页、点击打开、右键菜单、fs.watch 刷新、空态/错误态 |
 | P3 拖放 | ✅ 完成 | 拖入移入（重名 (n)、跨盘回退、跳过已在内）、单文件拖出、拖入高亮/toast |
 | P4 系统集成 | ✅ 完成 | 托盘、设置页（文件夹/背景/压暗/模糊/大小/自启）、开机自启、单实例、多瓦片（≤6） |
-| P5 打磨打包 | ⬜ 待开始 | 动画调参、内存优化、打包便携版 |
+| P5 打磨打包 | ✅ 完成 | 性能实测、内存优化、electron-builder 便携版（portable exe + zip） |
 
 - 开发计划：[docs/开发计划.md](docs/开发计划.md)
-- 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md)
+- 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md)
 
-## 运行
+## 发布 / 直接使用
+
+| 产物 | 用法 |
+|---|---|
+| `release/PhoneFolder-0.5.0-portable.exe`（93.5MB） | **双击即用**（自解压到临时目录运行） |
+| `release/PhoneFolder-0.5.0-win.zip`（133.1MB） | 解压后运行 `win-unpacked/PhoneFolder.exe` |
+
+- 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
+- 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
+- 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
+
+## 开发运行
 
 ```powershell
 pnpm install    # 首次
@@ -28,6 +41,14 @@ pnpm shot       # 自动截图到 shots/（瓦片态 → 展开中 → 展开态
 
 > 注意：本机 DSH 终端里 `ELECTRON_RUN_AS_NODE=1`，启动前需清掉该环境变量，否则 Electron 会以 Node 模式运行：
 > `Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue; pnpm start`
+
+## 打包
+
+```powershell
+$env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
+$env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'
+pnpm dist            # zip + portable，输出到 release/
+```
 
 ## 交互
 
@@ -66,9 +87,9 @@ node scripts/e2e-settings.js     # E2E：多瓦片 + 自启注册表 + 设置窗
 }
 ```
 
-- 瓦片位置拖动自动写回；设置页保存时统一重编号 `t1..tN`。
-- `overlay.dim`（0.15–0.7 压暗）、`overlay.blur`（8–48px）、`overlay.background` 为背景方案。
-- 手改配置损坏会备份成 `config.broken-<时间>.json` 并回默认值；数值越界自动夹取。
+- 瓦片位置拖动自动写回；设置页保存时统一重编号 `t1..tN`
+- `overlay.dim`（0.15–0.7 压暗）、`overlay.blur`（8–48px）、`overlay.background` 背景方案
+- 配置损坏会备份成 `config.broken-<时间>.json` 并回默认值；数值越界自动夹取
 
 ## 背景模式
 
@@ -80,15 +101,26 @@ node scripts/e2e-settings.js     # E2E：多瓦片 + 自启注册表 + 设置窗
 | `capture` | 抓当前桌面缩略图（会把开着的窗口一起模糊），缓存预热后打开 ≤150ms | 想要「模糊当前桌面」的实时感 |
 | `acrylic` | DWM acrylic 实时模糊 | 实验；Win11 浅色主题下偏奶白 |
 
+## 性能实测（本机 Win11 26H2 / 1920×1080 / 12 核）
+
+| 指标 | 实测 |
+|---|---|
+| 启动→瓦片可见 | 420–670ms |
+| 点击→浮层首帧 | 35–59ms（常见），偶发 ~240ms |
+| 展开动画帧率 | ~75fps |
+| 空闲 CPU | 0.01% |
+| 常驻内存 | 私有 241MB（开发）/ 258MB（打包），工作集约 417MB |
+
 ## 目录结构
 
 ```
 D:\deskTop\phoneS\
-├─ package.json / .npmrc / .gitignore
+├─ package.json / .npmrc / .gitignore / electron-builder.yml
 ├─ assets\                 icon.ico / icon.png（托盘与窗口图标）
-├─ docs\                   开发计划 + P1~P4 进展
+├─ docs\                   开发计划 + P1~P5 进展
 ├─ scripts\                诊断 / E2E / 截图辅助脚本
 ├─ shots\                  截图产物（gitignore）
+├─ release\                打包产物（gitignore）
 ├─ src\
 │  ├─ main\
 │  │  ├─ main.js           生命周期、多瓦片、托盘、设置、自启、IPC
@@ -99,10 +131,9 @@ D:\deskTop\phoneS\
 └─ tests\unit\run.js       单元测试
 ```
 
-## 已知限制
+## 已知限制（v2 可选项）
 
-- 瓦片是普通窗口：会被其他窗口盖住；Win+D 显示桌面时会被一起藏起来（P6「真占格」解决）
+- 未签名 → SmartScreen 首次提示；无自动更新
+- 瓦片是普通窗口：会被其他窗口盖住；Win+D 显示桌面时会被一起藏起来（可选 P6「真占格」）
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件；拖入是移动语义（不复制）
-- 多显示器未适配（瓦片/浮层/设置均按主屏）；瓦片大小是全局设置
-- 未打包；未签名 exe 会有 SmartScreen 提示（P5 处理）
-- 空闲内存约 400MB（5 个 Electron 进程，含预创建浮层）；P5 优化
+- 多显示器未适配；瓦片大小是全局设置

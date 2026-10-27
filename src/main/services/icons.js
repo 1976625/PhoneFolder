@@ -4,8 +4,8 @@
 const path = require('path');
 const { app, nativeImage } = require('electron');
 
-const MEMORY_LIMIT = 300;
-const THUMBNAIL_SIZE = { width: 256, height: 256 };
+const MEMORY_LIMIT = 150;
+const THUMBNAIL_SIZE = { width: 128, height: 128 };
 
 // 图片/视频优先缩略图；其余走系统图标
 const THUMBNAIL_EXT = new Set([
@@ -82,3 +82,4 @@ function clearCache() {
 }
 
 module.exports = { payloadForItem, clearCache };
+
