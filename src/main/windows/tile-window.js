@@ -6,10 +6,11 @@ const { BrowserWindow } = require('electron');
 
 const PRELOAD = path.join(__dirname, '..', '..', 'preload', 'preload.js');
 const TILE_HTML = path.join(__dirname, '..', '..', 'renderer', 'tile', 'index.html');
+const ICON = path.join(__dirname, '..', '..', '..', 'assets', 'icon.ico');
 
 const LABEL_HEIGHT = 20;
 
-function createTileWindow(tile) {
+function createTileWindow(tile, { visible = true } = {}) {
   const win = new BrowserWindow({
     x: tile.x,
     y: tile.y,
@@ -30,6 +31,7 @@ function createTileWindow(tile) {
     alwaysOnTop: false,
     focusable: true,
     title: 'PhoneFolder',
+    icon: ICON,
     webPreferences: {
       preload: PRELOAD,
       contextIsolation: true,
@@ -42,7 +44,9 @@ function createTileWindow(tile) {
   });
 
   win.loadFile(TILE_HTML);
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => {
+    if (visible) win.show();
+  });
   return win;
 }
 

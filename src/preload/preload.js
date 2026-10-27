@@ -30,6 +30,14 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   // 截图用假桌面
   onBackdropInit: (cb) => ipcRenderer.on('backdrop:init', (_event, data) => cb(data)),
 
+  // 设置页
+  settingsGet: () => ipcRenderer.invoke('settings:get'),
+  settingsSave: (input) => ipcRenderer.invoke('settings:save', input),
+  settingsPickFolder: () => ipcRenderer.invoke('settings:pick-folder'),
+  settingsClose: () => ipcRenderer.send('settings:close'),
+  onSettingsInit: (cb) => ipcRenderer.on('settings:init', (_event, data) => cb(data)),
+  onSettingsReloaded: (cb) => ipcRenderer.on('settings:reloaded', (_event, data) => cb(data)),
+
   // 通用
   getConfig: () => ipcRenderer.invoke('config:get'),
   getPathForFile: (file) => webUtils.getPathForFile(file),

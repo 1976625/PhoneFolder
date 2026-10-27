@@ -261,6 +261,13 @@ function applyPayload(data) {
   page = 0;
 }
 
+function applyLook(dim, blur) {
+  const dimValue = Math.min(Math.max(Number(dim) || 0.42, 0.15), 0.7);
+  const blurValue = Math.min(Math.max(Number(blur) || 26, 8), 48);
+  bgEl.style.filter = `blur(${blurValue}px) saturate(1.2)`;
+  dimEl.style.background = `radial-gradient(130% 100% at 50% 36%, rgba(10, 10, 14, ${(dimValue * 0.62).toFixed(3)}), rgba(0, 0, 0, ${(dimValue * 1.38).toFixed(3)})), rgba(0, 0, 0, ${(dimValue * 0.62).toFixed(3)})`;
+}
+
 function openOverlay(data) {
   if (isOpen && !isClosing) return;
   if (closeTimer) {
@@ -277,6 +284,7 @@ function openOverlay(data) {
     height: 84
   };
   applyPayload(data);
+  applyLook(data.dim, data.blur);
 
   if (data.backgroundImage) {
     bgEl.style.backgroundImage = `url("${data.backgroundImage}")`;

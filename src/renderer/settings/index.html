@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;">
+  <title>PhoneFolder 设置</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="logo">▦</div>
+    <div class="header-text">
+      <h1>PhoneFolder 设置</h1>
+      <p>桌面手机文件夹 · 配置</p>
+    </div>
+  </header>
+
+  <main class="content">
+    <section class="section">
+      <div class="section-head">
+        <h2>瓦片</h2>
+        <span class="hint" id="tile-hint">最多 6 个，同一文件夹只能绑一次</span>
+      </div>
+      <div id="tile-list" class="tile-list"></div>
+      <button id="add-tile" type="button" class="btn ghost">+ 添加瓦片</button>
+    </section>
+
+    <section class="section">
+      <h2>外观</h2>
+      <label class="row">
+        <span>背景</span>
+        <select id="background"></select>
+      </label>
+      <label class="row">
+        <span>压暗程度</span>
+        <input id="dim" type="range" min="15" max="70" step="1">
+        <b class="value" id="dim-val"></b>
+      </label>
+      <label class="row">
+        <span>模糊强度</span>
+        <input id="blur" type="range" min="8" max="48" step="1">
+        <b class="value" id="blur-val"></b>
+      </label>
+      <label class="row">
+        <span>瓦片大小</span>
+        <input id="size" type="range" min="64" max="128" step="4">
+        <b class="value" id="size-val"></b>
+      </label>
+    </section>
+
+    <section class="section">
+      <h2>系统</h2>
+      <label class="row check">
+        <input id="autostart" type="checkbox">
+        <span>开机自动启动</span>
+      </label>
+      <p class="hint">打包版会随 Windows 登录启动；开发版也会写注册表，取消勾选即可移除。</p>
+    </section>
+
+    <div id="error" class="error"></div>
+  </main>
+
+  <footer class="footer">
+    <button id="cancel" type="button" class="btn">取消</button>
+    <button id="save" type="button" class="btn primary">保存并应用</button>
+  </footer>
+
+  <div id="toast" class="toast"></div>
+  <script src="renderer.js"></script>
+</body>
+</html>

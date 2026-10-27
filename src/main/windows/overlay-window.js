@@ -19,10 +19,19 @@ const PRELOAD = path.join(__dirname, '..', '..', 'preload', 'preload.js');
 const OVERLAY_HTML = path.join(__dirname, '..', '..', 'renderer', 'overlay', 'index.html');
 
 class OverlayWindow {
-  constructor() {
-    this.mode = backgroundMode();
+  constructor(backgroundModeName) {
+    this.mode = backgroundModeName || backgroundMode();
     this.display = screen.getPrimaryDisplay();
     this.win = null;
+    this.readyPromise = null;
+    this.isOpen = false;
+  }
+
+  dispose() {
+    if (this.win) {
+      try { this.win.destroy(); } catch { /* ignore */ }
+      this.win = null;
+    }
     this.readyPromise = null;
     this.isOpen = false;
   }

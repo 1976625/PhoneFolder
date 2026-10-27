@@ -8,6 +8,7 @@ const path = require('path');
 
 const { sortItems, isIgnoredName } = require('../../src/main/services/folder');
 const { findAvailableName, moveIntoFolder } = require('../../src/main/services/fsops');
+const { sanitizeSettings } = require('../../src/main/services/settings');
 
 const tests = [];
 function test(name, fn) {
@@ -96,6 +97,54 @@ test('moveIntoFolder 移动/重名/跳过/自嵌套', async () => {
   } finally {
     await fsp.rm(base, { recursive: true, force: true });
   }
+});
+
+test('sanitizeSettings 去重/夹取/默认值', () => {
+  const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+  const exists = (p) => p === 'D:\\deskTop' || p === 'D:\\deskTop\\phoneS';
+  const out = sanitizeSettings({
+    tiles: [
+      { folder: 'D:\\deskTop', x: 9999, y: -50, size: 999 },
+      { folder: 'd:\\desktop' },
+      { folder: 'D:\\deskTop\\phoneS', size: 40 }
+    ],
+    overlay: { dim: 5, blur: 1, background: 'nope' },
+    app: { launchAtLogin: 1 }
+  }, { displayBounds: bounds, pathExists: exists });
+
+  assert.strictEqual(out.tiles.length, 2);
+  assert.strictEqual(out.tiles[0].folder, 'D:\\deskTop');
+  assert.strictEqual(out.tiles[0].size, 128);
+  assert.ok(out.tiles[0].x <= 1920 - 128);
+  assert.ok(out.tiles[0].y >= 0);
+  assert.strictEqual(out.tiles[1].size, 64);
+  assert.strictEqual(out.overlay.dim, 0.7);
+  assert.strictEqual(out.overlay.blur, 8);
+  assert.strictEqual(out.overlay.background, 'wallpaper');
+  assert.strictEqual(out.app.launchAtLogin, true);
+});
+
+test('sanitizeSettings 校验文件夹绝对路径/存在/至少一个', () => {
+  const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+  assert.throws(
+    () => sanitizeSettings({ tiles: [{ folder: 'D:\\nope' }] }, { displayBounds: bounds, pathExists: () => false }),
+    /文件夹不存在/
+  );
+  assert.throws(
+    () => sanitizeSettings({ tiles: [] }, { displayBounds: bounds, pathExists: () => true }),
+    /至少保留一个瓦片/
+  );
+  assert.throws(
+    () => sanitizeSettings({ tiles: [{ folder: 'relative-folder' }] }, { displayBounds: bounds, pathExists: () => true }),
+    /绝对路径/
+  );
+});
+
+test('sanitizeSettings 最多 6 个瓦片', () => {
+  const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+  const tiles = Array.from({ length: 9 }, (_, index) => ({ folder: `D:\\tile-${index + 1}` }));
+  const out = sanitizeSettings({ tiles, overlay: {}, app: {} }, { displayBounds: bounds, pathExists: () => true });
+  assert.strictEqual(out.tiles.length, 6);
 });
 
 (async () => {

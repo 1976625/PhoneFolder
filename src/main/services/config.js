@@ -34,7 +34,7 @@ function baseDefaults() {
     tiles: [
       { id: 't1', folder: defaultFolder(), x: pos.x, y: pos.y, size: DEFAULT_TILE_SIZE, opacity: 1 }
     ],
-    overlay: { columns: 3, rows: 3, dim: 0.42, theme: 'dark', background: 'auto' },
+    overlay: { columns: 3, rows: 3, dim: 0.42, blur: 26, theme: 'dark', background: 'wallpaper' },
     behavior: { openOnSingleClick: true },
     app: { launchAtLogin: false, firstRunDone: true }
   };
@@ -95,7 +95,17 @@ function loadConfig() {
   if (!Array.isArray(merged.tiles) || merged.tiles.length === 0) {
     merged.tiles = defaults.tiles;
   }
-  merged.tiles = merged.tiles.map((tile, index) => clampTile(tile, index, displayBounds));
+  merged.tiles = merged.tiles.slice(0, 6).map((tile, index) => clampTile(tile, index, displayBounds));
+
+  // overlay 数值夹取：手改 config 也不至于把界面弄坏
+  merged.overlay.dim = Math.min(Math.max(Number(merged.overlay.dim) || 0.42, 0.15), 0.7);
+  merged.overlay.blur = Math.min(Math.max(Math.round(Number(merged.overlay.blur) || 26), 8), 48);
+  if (!['wallpaper', 'capture', 'acrylic'].includes(merged.overlay.background)) {
+    merged.overlay.background = 'wallpaper';
+  }
+  merged.overlay.columns = 3;
+  merged.overlay.rows = 3;
+  merged.overlay.theme = 'dark';
 
   try {
     if (!fs.existsSync(file)) writeAtomic(file, merged);

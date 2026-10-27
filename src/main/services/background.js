@@ -26,10 +26,13 @@ let captureInflight = null;
 let wallpaperCache = null; // { path, mtimeMs, dataUrl, at }
 let wallpaperInflight = null;
 
-function mode() {
+function envMode() {
   const pref = (process.env.PF_BG || '').toLowerCase();
-  if (pref === 'acrylic' || pref === 'capture' || pref === 'wallpaper') return pref;
-  return 'wallpaper';
+  return (pref === 'acrylic' || pref === 'capture' || pref === 'wallpaper') ? pref : null;
+}
+
+function mode() {
+  return envMode() || 'wallpaper';
 }
 
 /* ------------------------------ capture ------------------------------ */
@@ -190,6 +193,7 @@ function windowsBuild() {
 
 module.exports = {
   mode,
+  envMode,
   warmCapture,
   getCachedCapture,
   warmWallpaper,
@@ -197,6 +201,7 @@ module.exports = {
   readWallpaperDataUrl,
   windowsBuild
 };
+
 
 
 
