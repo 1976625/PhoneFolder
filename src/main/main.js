@@ -15,6 +15,7 @@ const { createBackdropWindow } = require('./windows/backdrop-window');
 const { createSettingsWindow } = require('./windows/settings-window');
 const { scanFolder } = require('./services/folder');
 const { payloadForItem, prefetchShortcutIcons } = require('./services/icons');
+const { bottomWindow, topmostWindow, normalWindow, focusDesktop, watchDesktopState } = require('./services/native-window');
 const { moveIntoFolder } = require('./services/fsops');
 const { sanitizeSettings, settingsSnapshot, cleanTileName } = require('./services/settings');
 const {
@@ -41,6 +42,7 @@ const SHOT_DIR = app.isPackaged
   ? path.join(app.getPath('temp'), 'phonefolder-shots')
   : path.join(ROOT, 'shots', process.env.PF_SHOT_DIR || '');
 const ICON_PATH = path.join(ROOT, 'assets', 'icon.ico');
+const TRANSPARENT_ICON = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const PAGE_SIZE = 9;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -53,6 +55,7 @@ let backdrop = null;
 let tray = null;
 let settingsWin = null;
 let tilesVisible = true;
+let quitting = false;
 let rebuilding = false;
 let precreateTimer = null;
 
@@ -266,6 +269,65 @@ function isInsideFolder(target, folder) {
   }
 }
 
+// 桌面聚焦（点「显示桌面」/ Win+D）时把瓦片临时置顶，保证它在桌面上可见；
+// 切回普通软件时立即取消置顶并压回最底层，保证瓦片永远在其它软件下面。
+let lastShowDesktop = false;
+
+// showDesktop=true：桌面聚焦且没有其它可见软件窗口（Win+D / 显示桌面）→ 瓦片临时置顶保持可见
+// showDesktop=false：有软件窗口 → 取消置顶并压回最底层，保证瓦片永远在软件下面
+function applyDesktopState(showDesktop) {
+  if (quitting) return;
+  lastShowDesktop = showDesktop;
+  if (!tilesVisible) return;
+  for (const win of tileWindows.values()) {
+    if (!win || win.isDestroyed()) continue;
+    try {
+      if (showDesktop) {
+        topmostWindow(win);
+        win.showInactive();
+        win.moveTop();
+      } else {
+        win.setAlwaysOnTop(false);
+        bottomWindow(win);
+      }
+    } catch (err) {
+      log('apply desktop state failed:', err.message);
+    }
+  }
+}
+
+// 任务栏「显示桌面」/ Win+D 不会触发 minimize 事件，而是直接把窗口藏起来；
+// 这里做 500ms 轮询兜底：瓦片本该显示却被系统藏掉 → 重新 showInactive 并压回最底层。
+let tileWatchTimer = null;
+
+function startTileWatcher() {
+  if (tileWatchTimer) return;
+  tileWatchTimer = setInterval(() => {
+    if (quitting || !tilesVisible) return;
+    for (const win of tileWindows.values()) {
+      if (!win || win.isDestroyed()) continue;
+      if (!win.isVisible() || win.isMinimized()) {
+        try {
+          win.showInactive();
+          setTimeout(() => { if (win && !win.isDestroyed()) { if (lastShowDesktop) topmostWindow(win); else bottomWindow(win); } }, 120);
+          log('tile auto-shown after system hide');
+        } catch (err) {
+          log('tile auto-show failed:', err.message);
+        }
+      }
+    }
+  }, 500);
+}
+
+// 让瓦片始终待在普通窗口的 z-order 最底层（像桌面图标一样，不会盖住其它软件）
+function bottomAllTiles() {
+  for (const win of tileWindows.values()) {
+    if (!win || win.isDestroyed()) continue;
+    if (lastShowDesktop) topmostWindow(win);
+    else bottomWindow(win);
+  }
+}
+
 async function createTileWindowFor(tile) {
   const win = createTileWindow(tile, { visible: tilesVisible });
   tileWindows.set(tile.id, win);
@@ -273,6 +335,11 @@ async function createTileWindowFor(tile) {
   win.webContents.once('did-finish-load', () => {
     if (!win.isDestroyed()) win.webContents.send('tile:init', buildTilePayload(tile));
     log('tile renderer loaded', tile.id, win.getBounds());
+  });
+  win.once('ready-to-show', () => {
+    setTimeout(() => {
+      if (!win.isDestroyed()) { if (lastShowDesktop) topmostWindow(win); else bottomWindow(win); }
+    }, 120);
   });
   win.webContents.on('render-process-gone', (_event, details) => log('tile renderer gone', tile.id, details));
   win.on('closed', () => {
@@ -354,8 +421,15 @@ function toggleTiles() {
   tilesVisible = !tilesVisible;
   for (const win of tileWindows.values()) {
     if (!win || win.isDestroyed()) continue;
-    if (tilesVisible) win.show();
-    else win.hide();
+    if (tilesVisible) {
+      win.show();
+      setTimeout(() => {
+        if (lastShowDesktop) topmostWindow(win);
+        else bottomWindow(win);
+      }, 120);
+    } else {
+      win.hide();
+    }
   }
   log('tiles visibility:', tilesVisible);
 }
@@ -444,6 +518,7 @@ async function rebuildAll() {
     for (const tile of config.tiles) startWatcher(tile.id);
     if (!isStage) scheduleOverlayPrecreate();
     warmBackground({ force: true });
+    bottomAllTiles();
     log('config applied:', config.tiles.length, 'tiles,', effectiveBackgroundMode());
   } finally {
     rebuilding = false;
@@ -487,6 +562,8 @@ function registerIpc() {
     overlay.hide();
     overlayTileId = null;
     log('overlay hidden');
+    // 隐藏的浮层窗口可能一直占着前台，导致瓦片被判定为「有软件在前台」
+    focusDesktop();
     warmBackground();
   });
 
@@ -577,14 +654,45 @@ function registerIpc() {
         icon = null;
       }
     }
-    const iconPromise = icon ? Promise.resolve(icon) : app.getFileIcon(payload.path, { size: 'large' });
-    iconPromise.then((dragIcon) => {
+    // startDrag 会同步跑完整个原生拖拽循环；而浮层是全屏置顶窗口，若不先收起，
+    // 鼠标松开时文件会落回浮层自己身上（被当作「已在文件夹内」跳过）。
+    // 所以顺序必须是：先收起浮层 → 再 startDrag。
+    if (overlay && overlay.win && !overlay.win.isDestroyed()) {
+      try { overlay.win.webContents.send('overlay:close'); } catch { /* ignore */ }
+      try { overlay.hide(); } catch { /* ignore */ }
+      overlayTileId = null;
+      bottomAllTiles();
+      log('drag-out: overlay hidden before startDrag');
+    }
+    let dragIcon = icon;
+    if (!dragIcon || dragIcon.isEmpty()) dragIcon = nativeImage.createFromPath(ICON_PATH);
+    if (!dragIcon || dragIcon.isEmpty()) dragIcon = nativeImage.createFromDataURL(TRANSPARENT_ICON);
+    const sourceTileId = overlayTileId;
+    const desktopTarget = path.join(app.getPath('desktop'), path.basename(payload.path));
+    const hadDesktopCopy = fs.existsSync(desktopTarget);
+    setTimeout(() => {
       try {
         event.sender.startDrag({ file: payload.path, icon: dragIcon });
+        log('drag-out: startDrag done', payload.path);
       } catch (err) {
         log('startDrag failed:', err.message);
+        return;
       }
-    }).catch((err) => log('drag-out failed:', err.message));
+      // 系统拖拽默认是「复制」：如果松手落在桌面上，就把源文件删掉，实现「拖出=移出」
+      // 只有拖拽前桌面上没有同名文件、拖完后出现了，才认为是这次拖拽产生的副本，避免误删。
+      setTimeout(() => {
+        try {
+          if (hadDesktopCopy) return;
+          if (!fs.existsSync(desktopTarget)) return;
+          if (!fs.existsSync(payload.path)) return;
+          fs.rmSync(payload.path, { force: true });
+          log('drag-out: removed source after desktop drop', payload.path);
+          if (sourceTileId) refreshTile(sourceTileId).catch(() => {});
+        } catch (err) {
+          log('drag-out cleanup failed:', err.message);
+        }
+      }, 260);
+    }, 50);
   });
 
   ipcMain.on('tile:contextmenu', (event) => {
@@ -639,6 +747,8 @@ function registerIpc() {
     tile.y = y;
     saveConfig(config);
     log('tile moved', tileId, { x, y });
+    if (lastShowDesktop) topmostWindow(win);
+    else normalWindow(win);
   });
 
   /* ----------------------------- 设置 ----------------------------- */
@@ -766,6 +876,12 @@ async function bootstrap() {
   await createAllTileWindows();
   for (const tile of config.tiles) startWatcher(tile.id);
   log('startup: tile ready in', Date.now() - PROCESS_START, 'ms');
+  if (!isStage) {
+    startTileWatcher();
+    watchDesktopState(applyDesktopState);
+    // 启动时瓦片窗口可能抢到前台，导致被判定成「有软件前台」而压到底层；把焦点还给桌面
+    setTimeout(() => { focusDesktop(); }, 500);
+  }
 
   if (isShot) {
     await runShot(config.tiles[0]);
@@ -804,6 +920,11 @@ if (!app.requestSingleInstanceLock()) {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  quitting = true;
+  if (tileWatchTimer) {
+    clearInterval(tileWatchTimer);
+    tileWatchTimer = null;
+  }
   if (precreateTimer) clearTimeout(precreateTimer);
   for (const tileId of [...folderStates.keys()]) stopWatcher(tileId);
   if (tray) {
@@ -821,5 +942,25 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

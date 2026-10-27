@@ -255,6 +255,7 @@ function itemEl(item, index) {
   btn.append(icon, name);
   btn.addEventListener('click', (event) => {
     event.stopPropagation();
+    if (suppressClick) return;
     icon.animate(
       [{ transform: 'scale(1)' }, { transform: 'scale(0.9)' }, { transform: 'scale(1)' }],
       { duration: 220, easing: 'ease-out' }
@@ -267,16 +268,32 @@ function itemEl(item, index) {
     event.stopPropagation();
     window.phoneFolder.showItemMenu(item.path);
   });
-  // 拖出：拖到资源管理器/桌面，用系统原生拖拽（一次一个文件）
-  btn.draggable = true;
-  btn.addEventListener('dragstart', (event) => {
-    event.preventDefault();
+  // 拖出：按下后移动超过阈值就调用 Electron 原生 startDrag（一次一个文件）。
+  // 注意：<button> 上的 HTML5 dragstart 不可靠，所以不用 draggable，直接走 pointer 事件。
+  let dragPointer = null;
+  let suppressClick = false;
+  btn.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    dragPointer = { x: event.screenX, y: event.screenY, started: false };
+  });
+  btn.addEventListener('pointermove', (event) => {
+    if (!dragPointer || dragPointer.started) return;
+    const moved = Math.abs(event.screenX - dragPointer.x) + Math.abs(event.screenY - dragPointer.y);
+    if (moved < 6) return;
+    dragPointer.started = true;
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 1500);
+    btn.classList.add('dragging-out');
     const cached = iconCache.get(item.path);
     window.phoneFolder.dragOut({
       path: item.path,
       iconDataUrl: cached ? cached.dataUrl : null
     });
   });
+  const endPointerDrag = () => { dragPointer = null; };
+  btn.addEventListener('pointerup', endPointerDrag);
+  btn.addEventListener('pointercancel', endPointerDrag);
+  btn.addEventListener('pointerleave', () => { if (dragPointer && !dragPointer.started) dragPointer = null; });
 
   loadIcon(item, icon, glyph);
   return btn;
@@ -556,6 +573,9 @@ document.addEventListener('drop', async (event) => {
   const summary = await window.phoneFolder.dropFiles(paths);
   showToast(summary);
 });
+
+
+
 
 
 
