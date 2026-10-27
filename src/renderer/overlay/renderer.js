@@ -7,6 +7,9 @@ const titleEl = document.getElementById('title');
 const eyebrowEl = document.getElementById('eyebrow');
 const gridEl = document.getElementById('grid');
 const dotsEl = document.getElementById('dots');
+const toastEl = document.getElementById('toast');
+const dropHintEl = document.getElementById('drop-hint');
+const dropFolderEl = document.getElementById('drop-folder');
 
 const GROW_SCALE = 0.19;
 const OPEN_MS = 380;
@@ -168,6 +171,16 @@ function itemEl(item, index) {
     event.stopPropagation();
     window.phoneFolder.showItemMenu(item.path);
   });
+  // 拖出：拖到资源管理器/桌面，用系统原生拖拽（一次一个文件）
+  btn.draggable = true;
+  btn.addEventListener('dragstart', (event) => {
+    event.preventDefault();
+    const cached = iconCache.get(item.path);
+    window.phoneFolder.dragOut({
+      path: item.path,
+      iconDataUrl: cached ? cached.dataUrl : null
+    });
+  });
 
   loadIcon(item, icon, glyph);
   return btn;
@@ -244,6 +257,7 @@ function applyPayload(data) {
   errorMessage = data.errorMessage || null;
   truncated = Boolean(data.truncated);
   folderNameRef = data.folderName || '文件夹';
+  dropFolderEl.textContent = folderNameRef;
   page = 0;
 }
 
@@ -355,6 +369,73 @@ window.addEventListener('pointerup', (event) => {
 
 document.addEventListener('mousedown', (event) => {
   if (!panelEl.contains(event.target)) closeOverlay();
+});
+
+/* ---------------------------- 拖入移入 ---------------------------- */
+let toastTimer = null;
+
+function showToast(summary) {
+  if (!summary) return;
+  const moved = Number(summary.moved) || 0;
+  const skipped = Number(summary.skipped) || 0;
+  const failed = Number(summary.failed) || 0;
+  let text;
+  if (failed > 0) text = `${moved} 项已移入，${failed} 项失败`;
+  else if (skipped > 0) text = `${moved} 项已移入（${skipped} 项已在文件夹内）`;
+  else text = `已移入 ${moved} 项`;
+  if (summary.error) text = `移入失败：${summary.error}`;
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastTimer = null;
+    toastEl.classList.remove('show');
+  }, 2200);
+}
+
+function hasFiles(event) {
+  return Boolean(event.dataTransfer) && Array.from(event.dataTransfer.types || []).includes('Files');
+}
+
+let dragDepth = 0;
+
+document.addEventListener('dragenter', (event) => {
+  if (!hasFiles(event)) return;
+  event.preventDefault();
+  dragDepth += 1;
+  document.body.classList.add('drop-active');
+});
+
+document.addEventListener('dragover', (event) => {
+  if (!hasFiles(event)) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+});
+
+document.addEventListener('dragleave', (event) => {
+  if (!hasFiles(event)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) document.body.classList.remove('drop-active');
+});
+
+document.addEventListener('drop', async (event) => {
+  if (!hasFiles(event)) return;
+  event.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('drop-active');
+
+  const files = Array.from(event.dataTransfer.files || []);
+  const paths = files.map((file) => {
+    try {
+      return window.phoneFolder.getPathForFile(file);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+  if (paths.length === 0) return;
+
+  const summary = await window.phoneFolder.dropFiles(paths);
+  showToast(summary);
 });
 
 

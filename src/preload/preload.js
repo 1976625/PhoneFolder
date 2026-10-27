@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   getIcon: (item) => ipcRenderer.invoke('icons:get', item),
   openItem: (itemPath) => ipcRenderer.send('item:open', itemPath),
   showItemMenu: (itemPath) => ipcRenderer.send('item:menu', itemPath),
+  dropFiles: (paths) => ipcRenderer.invoke('files:drop-in', paths),
+  dragOut: (payload) => ipcRenderer.send('item:drag-out', payload),
 
   // 截图用假桌面
   onBackdropInit: (cb) => ipcRenderer.on('backdrop:init', (_event, data) => cb(data)),

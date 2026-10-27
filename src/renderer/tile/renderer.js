@@ -75,18 +75,23 @@ function renderThumb(item) {
   return el;
 }
 
-function render(data) {
-  labelEl.textContent = data.folderName || '文件夹';
-  thumbsEl.textContent = '';
-  thumbsEl.classList.toggle('empty', Boolean(data.error) === false && (!data.items || data.items.length === 0));
-  thumbsEl.classList.toggle('error', Boolean(data.error));
+let currentLabel = '文件夹';
+let feedbackTimer = null;
 
-  if (data.error) {
+function render(data) {
+  const isError = Boolean(data.error);
+  currentLabel = isError ? '读取失败' : (data.folderName || '文件夹');
+  if (!feedbackTimer) labelEl.textContent = currentLabel;
+
+  thumbsEl.textContent = '';
+  thumbsEl.classList.toggle('empty', !isError && (!data.items || data.items.length === 0));
+  thumbsEl.classList.toggle('error', isError);
+
+  if (isError) {
     const glyph = document.createElement('span');
     glyph.className = 'tile-glyph';
     glyph.textContent = '⚠️';
     thumbsEl.appendChild(glyph);
-    labelEl.textContent = '读取失败';
     return;
   }
 
@@ -162,4 +167,63 @@ tileEl.addEventListener('click', (event) => {
     return;
   }
   window.phoneFolder.activateTile();
+});
+
+/* ---------------------------- 拖入移入 ---------------------------- */
+function hasFiles(event) {
+  return Boolean(event.dataTransfer) && Array.from(event.dataTransfer.types || []).includes('Files');
+}
+
+function flashResult(summary) {
+  if (!summary) return;
+  const moved = Number(summary.moved) || 0;
+  const failed = Number(summary.failed) || 0;
+  labelEl.textContent = failed > 0 ? `${moved} 移入 / ${failed} 失败` : `已移入 ${moved} 项`;
+  if (feedbackTimer) clearTimeout(feedbackTimer);
+  feedbackTimer = setTimeout(() => {
+    feedbackTimer = null;
+    labelEl.textContent = currentLabel;
+  }, 1900);
+}
+
+let dropDepth = 0;
+
+document.addEventListener('dragenter', (event) => {
+  if (!hasFiles(event)) return;
+  event.preventDefault();
+  dropDepth += 1;
+  tileEl.classList.add('drag-over');
+});
+
+document.addEventListener('dragover', (event) => {
+  if (!hasFiles(event)) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  tileEl.classList.add('drag-over');
+});
+
+document.addEventListener('dragleave', (event) => {
+  if (!hasFiles(event)) return;
+  dropDepth = Math.max(0, dropDepth - 1);
+  if (dropDepth === 0) tileEl.classList.remove('drag-over');
+});
+
+document.addEventListener('drop', async (event) => {
+  if (!hasFiles(event)) return;
+  event.preventDefault();
+  dropDepth = 0;
+  tileEl.classList.remove('drag-over');
+
+  const files = Array.from(event.dataTransfer.files || []);
+  const paths = files.map((file) => {
+    try {
+      return window.phoneFolder.getPathForFile(file);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+  if (paths.length === 0) return;
+
+  const summary = await window.phoneFolder.dropFiles(paths);
+  flashResult(summary);
 });

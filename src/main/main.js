@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, ipcMain, Menu, screen, desktopCapturer, shell, clipboard } = require('electron');
+const { app, ipcMain, Menu, screen, desktopCapturer, shell, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -11,6 +11,7 @@ const { OverlayWindow } = require('./windows/overlay-window');
 const { createBackdropWindow } = require('./windows/backdrop-window');
 const { scanFolder } = require('./services/folder');
 const { payloadForItem } = require('./services/icons');
+const { moveIntoFolder } = require('./services/fsops');
 const {
   warmCapture,
   warmWallpaper,
@@ -220,6 +221,50 @@ function registerIpc() {
     shell.openPath(itemPath).then((message) => {
       if (message) log('open item failed:', itemPath, message);
     });
+  });
+
+  // 拖入：把拖来的文件/文件夹移进绑定文件夹（重名自动加 (n)，跨盘自动回退）
+  ipcMain.handle('files:drop-in', async (event, paths) => {
+    if (!isKnownSender(event) || !Array.isArray(paths)) return null;
+    const sources = paths.filter((p) => typeof p === 'string' && p).slice(0, 60);
+    if (sources.length === 0) return { moved: 0, skipped: 0, failed: 0, results: [] };
+    log('drop-in:', sources.length, 'items ->', activeFolder());
+    let summary;
+    try {
+      summary = await moveIntoFolder(sources, activeFolder());
+    } catch (err) {
+      log('drop-in failed:', err.message);
+      return { moved: 0, skipped: 0, failed: sources.length, results: [], error: err.message };
+    }
+    for (const result of summary.results) {
+      if (result.status === 'failed') log('drop-in failed item:', result.name, result.message);
+    }
+    log('drop-in done:', { moved: summary.moved, skipped: summary.skipped, failed: summary.failed });
+    await refreshAndBroadcast();
+    return summary;
+  });
+
+  // 拖出：renderer 的 dragstart 触发原生拖拽（Electron 限制：一次只能一个文件）
+  ipcMain.on('item:drag-out', (event, payload) => {
+    if (!overlay || !overlay.win || event.sender !== overlay.win.webContents) return;
+    if (!payload || !isInsideFolder(payload.path)) return;
+    let icon = null;
+    if (typeof payload.iconDataUrl === 'string' && payload.iconDataUrl.startsWith('data:image/')) {
+      try {
+        icon = nativeImage.createFromDataURL(payload.iconDataUrl);
+        if (icon.isEmpty()) icon = null;
+      } catch {
+        icon = null;
+      }
+    }
+    const iconPromise = icon ? Promise.resolve(icon) : app.getFileIcon(payload.path, { size: 'large' });
+    iconPromise.then((dragIcon) => {
+      try {
+        event.sender.startDrag({ file: payload.path, icon: dragIcon });
+      } catch (err) {
+        log('startDrag failed:', err.message);
+      }
+    }).catch((err) => log('drag-out failed:', err.message));
   });
 
   ipcMain.on('item:menu', (event, itemPath) => {
