@@ -274,16 +274,25 @@ function isInsideFolder(target, folder) {
 // 切回普通软件时立即取消置顶并压回最底层，保证瓦片永远在其它软件下面。
 let lastShowDesktop = false;
 
+function topmostOnShowDesktopEnabled() {
+  return Boolean(config && config.app && config.app.keepVisibleOnShowDesktop !== false);
+}
+
+function shouldTopmost() {
+  return lastShowDesktop && topmostOnShowDesktopEnabled();
+}
+
 // showDesktop=true：桌面聚焦且没有其它可见软件窗口（Win+D / 显示桌面）→ 瓦片临时置顶保持可见
 // showDesktop=false：有软件窗口 → 取消置顶并压回最底层，保证瓦片永远在软件下面
 function applyDesktopState(showDesktop) {
   if (quitting) return;
   lastShowDesktop = showDesktop;
   if (!tilesVisible) return;
+  const top = shouldTopmost();
   for (const win of tileWindows.values()) {
     if (!win || win.isDestroyed()) continue;
     try {
-      if (showDesktop) {
+      if (top) {
         topmostWindow(win);
         win.showInactive();
         win.moveTop();
@@ -304,13 +313,13 @@ let tileWatchTimer = null;
 function startTileWatcher() {
   if (tileWatchTimer) return;
   tileWatchTimer = setInterval(() => {
-    if (quitting || !tilesVisible) return;
+    if (quitting || !tilesVisible || !topmostOnShowDesktopEnabled()) return;
     for (const win of tileWindows.values()) {
       if (!win || win.isDestroyed()) continue;
       if (!win.isVisible() || win.isMinimized()) {
         try {
           win.showInactive();
-          setTimeout(() => { if (win && !win.isDestroyed()) { if (lastShowDesktop) topmostWindow(win); else bottomWindow(win); } }, 120);
+          setTimeout(() => { if (win && !win.isDestroyed()) { if (shouldTopmost()) topmostWindow(win); else bottomWindow(win); } }, 120);
           log('tile auto-shown after system hide');
         } catch (err) {
           log('tile auto-show failed:', err.message);
@@ -324,7 +333,7 @@ function startTileWatcher() {
 function bottomAllTiles() {
   for (const win of tileWindows.values()) {
     if (!win || win.isDestroyed()) continue;
-    if (lastShowDesktop) topmostWindow(win);
+    if (shouldTopmost()) topmostWindow(win);
     else bottomWindow(win);
   }
 }
@@ -339,7 +348,7 @@ async function createTileWindowFor(tile) {
   });
   win.once('ready-to-show', () => {
     setTimeout(() => {
-      if (!win.isDestroyed()) { if (lastShowDesktop) topmostWindow(win); else bottomWindow(win); }
+      if (!win.isDestroyed()) { if (shouldTopmost()) topmostWindow(win); else bottomWindow(win); }
     }, 120);
   });
   win.webContents.on('render-process-gone', (_event, details) => log('tile renderer gone', tile.id, details));
@@ -388,7 +397,11 @@ function isDirectory(target) {
 }
 
 function currentSettingsSnapshot() {
-  return settingsSnapshot(config);
+  return {
+    ...settingsSnapshot(config),
+    version: app.getVersion(),
+    dataDir: app.getPath('userData')
+  };
 }
 
 function openSettings() {
@@ -425,7 +438,7 @@ function toggleTiles() {
     if (tilesVisible) {
       win.show();
       setTimeout(() => {
-        if (lastShowDesktop) topmostWindow(win);
+        if (shouldTopmost()) topmostWindow(win);
         else bottomWindow(win);
       }, 120);
     } else {
@@ -794,11 +807,24 @@ function registerIpc() {
     tile.y = y;
     saveConfig(config);
     log('tile moved', tileId, { x, y });
-    if (lastShowDesktop) topmostWindow(win);
+    if (shouldTopmost()) topmostWindow(win);
     else normalWindow(win);
   });
 
   /* ----------------------------- 设置 ----------------------------- */
+  ipcMain.handle('settings:open-folder', (event, folderPath) => {
+    if (!isSettingsSender(event)) return { ok: false };
+    if (typeof folderPath !== 'string' || !folderPath) return { ok: false };
+    shell.openPath(folderPath).catch(() => {});
+    return { ok: true };
+  });
+
+  ipcMain.handle('settings:open-data-dir', (event) => {
+    if (!isSettingsSender(event)) return { ok: false };
+    shell.openPath(app.getPath('userData')).catch(() => {});
+    return { ok: true };
+  });
+
   ipcMain.handle('settings:get', (event) => {
     if (!isSettingsSender(event)) return null;
     return currentSettingsSnapshot();
@@ -989,6 +1015,7 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+
 
 
 

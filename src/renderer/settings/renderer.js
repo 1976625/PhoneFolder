@@ -8,12 +8,17 @@ const BACKGROUND_LABELS = {
   acrylic: 'DWM acrylic（实验）'
 };
 
-let snapshot = null; // { config, backgroundModes, maxTiles }
+let snapshot = null; // { config, backgroundModes, maxTiles, version, dataDir }
 let draft = null; // 工作副本
 let toastTimer = null;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function folderBase(folder) {
+  const parts = String(folder || '').split(/[\\/]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : String(folder || '');
 }
 
 function showToast(text) {
@@ -55,44 +60,81 @@ function buildBackgroundOptions() {
   };
 }
 
+function tileRow(tile, index) {
+  const row = document.createElement('div');
+  row.className = 'tile-row';
+
+  const main = document.createElement('div');
+  main.className = 'tile-main';
+
+  const badge = document.createElement('span');
+  badge.className = 'tile-index';
+  badge.textContent = String(index + 1);
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'tile-name';
+  nameInput.maxLength = 24;
+  nameInput.placeholder = folderBase(tile.folder);
+  nameInput.value = tile.name || '';
+  nameInput.title = '瓦片显示名（留空则用文件夹名）';
+  nameInput.addEventListener('input', () => {
+    const value = nameInput.value.trim();
+    if (value) tile.name = value;
+    else delete tile.name;
+  });
+
+  main.append(badge, nameInput);
+
+  main.append(makeButton('更改', 'mini', async () => {
+    const folder = await window.phoneFolder.settingsPickFolder();
+    if (!folder) return;
+    const duplicated = draft.tiles.some((t, i) => i !== index && t.folder.toLowerCase() === folder.toLowerCase());
+    if (duplicated) {
+      showError('这个文件夹已经绑定过瓦片了');
+      return;
+    }
+    tile.folder = folder;
+    showError('');
+    render();
+  }));
+
+  main.append(makeButton('打开', 'mini', () => {
+    window.phoneFolder.settingsOpenFolder(tile.folder).catch(() => {});
+  }));
+
+  if (Array.isArray(tile.order) && tile.order.length > 0) {
+    main.append(makeButton('重置排序', 'mini', () => {
+      delete tile.order;
+      showToast('已恢复默认排序（保存后生效）');
+      render();
+    }));
+  }
+
+  if (draft.tiles.length > 1) {
+    main.append(makeButton('删除', 'mini danger', () => {
+      draft.tiles.splice(index, 1);
+      render();
+    }));
+  }
+
+  const sub = document.createElement('div');
+  sub.className = 'tile-sub';
+  const pathEl = document.createElement('span');
+  pathEl.className = 'tile-path';
+  pathEl.textContent = tile.folder;
+  pathEl.title = tile.folder;
+  sub.append(pathEl);
+
+  row.append(main, sub);
+  return row;
+}
+
 function render() {
   // 瓦片列表
   const list = $('tile-list');
   list.textContent = '';
-  draft.tiles.forEach((tile, index) => {
-    const row = document.createElement('div');
-    row.className = 'tile-row';
-
-    const badge = document.createElement('span');
-    badge.className = 'tile-index';
-    badge.textContent = String(index + 1);
-
-    const pathEl = document.createElement('span');
-    pathEl.className = 'tile-path';
-    pathEl.textContent = tile.folder;
-    pathEl.title = tile.folder;
-
-    row.append(badge, pathEl);
-    row.append(makeButton('更改', 'mini', async () => {
-      const folder = await window.phoneFolder.settingsPickFolder();
-      if (!folder) return;
-      const duplicated = draft.tiles.some((t, i) => i !== index && t.folder.toLowerCase() === folder.toLowerCase());
-      if (duplicated) {
-        showError('这个文件夹已经绑定过瓦片了');
-        return;
-      }
-      tile.folder = folder;
-      showError('');
-      render();
-    }));
-    if (draft.tiles.length > 1) {
-      row.append(makeButton('删除', 'mini danger', () => {
-        draft.tiles.splice(index, 1);
-        render();
-      }));
-    }
-    list.appendChild(row);
-  });
+  draft.tiles.forEach((tile, index) => list.appendChild(tileRow(tile, index)));
 
   $('add-tile').disabled = draft.tiles.length >= snapshot.maxTiles;
   $('tile-hint').textContent = draft.tiles.length >= snapshot.maxTiles
@@ -112,6 +154,13 @@ function render() {
 
   // 系统
   $('autostart').checked = Boolean(draft.app && draft.app.launchAtLogin);
+  $('keep-visible').checked = !(draft.app && draft.app.keepVisibleOnShowDesktop === false);
+
+  // 关于
+  $('version').textContent = snapshot.version || '—';
+  $('data-dir').textContent = snapshot.dataDir || '';
+  $('data-dir').title = snapshot.dataDir || '';
+
   showError('');
 }
 
@@ -141,6 +190,13 @@ function wireInputs() {
   });
   $('autostart').addEventListener('change', () => {
     draft.app.launchAtLogin = $('autostart').checked;
+  });
+  $('keep-visible').addEventListener('change', () => {
+    draft.app.keepVisibleOnShowDesktop = $('keep-visible').checked;
+  });
+
+  $('open-data').addEventListener('click', () => {
+    window.phoneFolder.settingsOpenDataDir().catch(() => {});
   });
 
   $('add-tile').addEventListener('click', async () => {
@@ -175,7 +231,10 @@ function wireInputs() {
         order: tile.order
       })),
       overlay: { ...draft.overlay },
-      app: { launchAtLogin: $('autostart').checked }
+      app: {
+        launchAtLogin: $('autostart').checked,
+        keepVisibleOnShowDesktop: $('keep-visible').checked
+      }
     };
     const result = await window.phoneFolder.settingsSave(input);
     if (!result || !result.ok) {
@@ -201,5 +260,3 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (data) loadSnapshot(data);
   }
 });
-
-

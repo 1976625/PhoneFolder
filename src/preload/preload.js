@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   settingsGet: () => ipcRenderer.invoke('settings:get'),
   settingsSave: (input) => ipcRenderer.invoke('settings:save', input),
   settingsPickFolder: () => ipcRenderer.invoke('settings:pick-folder'),
+  settingsOpenFolder: (folderPath) => ipcRenderer.invoke('settings:open-folder', folderPath),
+  settingsOpenDataDir: () => ipcRenderer.invoke('settings:open-data-dir'),
   settingsClose: () => ipcRenderer.send('settings:close'),
   onSettingsInit: (cb) => ipcRenderer.on('settings:init', (_event, data) => cb(data)),
   onSettingsReloaded: (cb) => ipcRenderer.on('settings:reloaded', (_event, data) => cb(data)),
@@ -45,5 +47,6 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   getPathForFile: (file) => webUtils.getPathForFile(file),
   log: (...args) => ipcRenderer.send('log', args.map(String).join(' '))
 });
+
 
 

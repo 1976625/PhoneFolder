@@ -123,7 +123,11 @@ function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTi
     tiles,
     overlay: { columns: 3, rows: 3, dim, blur, theme: 'dark', background },
     behavior: { openOnSingleClick: true },
-    app: { launchAtLogin: Boolean(appIn.launchAtLogin), firstRunDone: true }
+    app: {
+      launchAtLogin: Boolean(appIn.launchAtLogin),
+      firstRunDone: true,
+      keepVisibleOnShowDesktop: appIn.keepVisibleOnShowDesktop !== false
+    }
   };
 }
 
@@ -145,6 +149,7 @@ module.exports = {
   isSamePath,
   cleanTileName
 };
+
 
 
 

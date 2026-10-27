@@ -171,6 +171,22 @@ test('applyCustomOrder 按自定义顺序排列，未知项保持默认顺序追
   assert.deepStrictEqual(applyCustomOrder(items, ['b']).map((item) => item.name), ['b', 'a', 'c']);
 });
 
+test('sanitizeSettings 保留「显示桌面保持可见」开关', () => {
+  const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+  const enabled = sanitizeSettings({
+    tiles: [{ folder: 'D:\\wf', x: 10, y: 20, size: 84 }],
+    overlay: { dim: 0.4, blur: 20, background: 'wallpaper' },
+    app: { launchAtLogin: false }
+  }, { displayBounds: bounds, pathExists: () => true });
+  assert.strictEqual(enabled.app.keepVisibleOnShowDesktop, true);
+  const disabled = sanitizeSettings({
+    tiles: [{ folder: 'D:\\wf', x: 10, y: 20, size: 84 }],
+    overlay: { dim: 0.4, blur: 20, background: 'wallpaper' },
+    app: { launchAtLogin: false, keepVisibleOnShowDesktop: false }
+  }, { displayBounds: bounds, pathExists: () => true });
+  assert.strictEqual(disabled.app.keepVisibleOnShowDesktop, false);
+});
+
 test('sanitizeSettings 保留自定义排序 order', () => {
   const out = sanitizeSettings({
     tiles: [{ folder: 'D:\\wf', order: ['b', 'a', 'b', '', 3], x: 10, y: 20, size: 84 }],
@@ -243,5 +259,6 @@ test('migrateConfig 已是 v4 时不做改动', () => {
   console.log(`\n${tests.length - failed}/${tests.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+
 
 

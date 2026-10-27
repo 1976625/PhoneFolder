@@ -106,12 +106,60 @@ body {
 
 .tile-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 10px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 10px 8px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.tile-main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tile-name {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.28);
+  color: #e8eaf0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.tile-name:focus {
+  border-color: rgba(124, 92, 240, 0.75);
+}
+
+.tile-sub {
+  display: flex;
+  padding-left: 29px;
+}
+
+.about-row {
+  gap: 10px;
+}
+
+.about-value {
+  color: #b9a9ff;
+  font-weight: 500;
+}
+
+.about-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(232, 234, 240, 0.6);
+  font-size: 11px;
 }
 
 .tile-index {
@@ -282,3 +330,4 @@ body {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+

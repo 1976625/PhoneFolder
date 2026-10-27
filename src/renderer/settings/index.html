@@ -23,6 +23,7 @@
       </div>
       <div id="tile-list" class="tile-list"></div>
       <button id="add-tile" type="button" class="btn ghost">+ 添加瓦片</button>
+      <p class="hint">在浮层里按住条目拖动 = 手动排序（会保存）；拖出面板范围 = 拖出文件。</p>
     </section>
 
     <section class="section">
@@ -54,7 +55,24 @@
         <input id="autostart" type="checkbox">
         <span>开机自动启动</span>
       </label>
-      <p class="hint">打包版会随 Windows 登录启动；开发版也会写注册表，取消勾选即可移除。</p>
+      <label class="row check">
+        <input id="keep-visible" type="checkbox">
+        <span>点「显示桌面」时保持瓦片可见</span>
+      </label>
+      <p class="hint">关闭后瓦片会和普通窗口一样被 Win+D 收起（更稳定，不会偶尔闪没）。</p>
+    </section>
+
+    <section class="section">
+      <h2>关于</h2>
+      <div class="row about-row">
+        <span>版本</span>
+        <b class="about-value" id="version">—</b>
+      </div>
+      <div class="row about-row">
+        <span>配置目录</span>
+        <span class="about-path" id="data-dir"></span>
+        <button id="open-data" type="button" class="btn mini">打开</button>
+      </div>
     </section>
 
     <div id="error" class="error"></div>

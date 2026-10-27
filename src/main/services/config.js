@@ -115,7 +115,7 @@ function baseDefaults() {
     ],
     overlay: { columns: 3, rows: 3, dim: 0.42, blur: 26, theme: 'dark', background: 'wallpaper' },
     behavior: { openOnSingleClick: true },
-    app: { launchAtLogin: false, firstRunDone: true }
+    app: { launchAtLogin: false, firstRunDone: true, keepVisibleOnShowDesktop: true }
   };
 }
 
@@ -271,5 +271,6 @@ module.exports = {
   STORAGE_FOLDER_NAME,
   storageFolderPath
 };
+
 
 
