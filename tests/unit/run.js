@@ -8,7 +8,7 @@ const path = require('path');
 
 const { sortItems, isIgnoredName } = require('../../src/main/services/folder');
 const { findAvailableName, moveIntoFolder } = require('../../src/main/services/fsops');
-const { sanitizeSettings, migrateConfig } = require('../../src/main/services/settings');
+const { sanitizeSettings, migrateConfig, cleanTileName } = require('../../src/main/services/settings');
 
 const tests = [];
 function test(name, fn) {
@@ -147,6 +147,23 @@ test('sanitizeSettings 最多 6 个瓦片', () => {
   assert.strictEqual(out.tiles.length, 6);
 });
 
+test('cleanTileName 去空白/换行并按 24 字截断', () => {
+  assert.strictEqual(cleanTileName('  工作   收纳  '), '工作 收纳');
+  assert.strictEqual(cleanTileName('a\nb\tc'), 'a b c');
+  assert.strictEqual(cleanTileName(''), '');
+  assert.strictEqual(cleanTileName(null), '');
+  assert.strictEqual(cleanTileName('一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十').length, 24);
+});
+
+test('sanitizeSettings 保留自定义瓦片名', () => {
+  const out = sanitizeSettings({
+    tiles: [{ folder: 'D:\\wf', name: ' 我的 收纳 ', x: 10, y: 20, size: 84 }],
+    overlay: { dim: 0.4, blur: 20, background: 'wallpaper' },
+    app: { launchAtLogin: false }
+  }, { displayBounds: { x: 0, y: 0, width: 1920, height: 1080 }, pathExists: () => true });
+  assert.strictEqual(out.tiles[0].name, '我的 收纳');
+});
+
 test('migrateConfig v2 的「绑定桌面」迁移到独立收纳目录', () => {
   const raw = {
     version: 2,
@@ -210,3 +227,4 @@ test('migrateConfig 已是 v4 时不做改动', () => {
   console.log(`\n${tests.length - failed}/${tests.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+

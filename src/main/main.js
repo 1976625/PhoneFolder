@@ -16,7 +16,7 @@ const { createSettingsWindow } = require('./windows/settings-window');
 const { scanFolder } = require('./services/folder');
 const { payloadForItem, prefetchShortcutIcons } = require('./services/icons');
 const { moveIntoFolder } = require('./services/fsops');
-const { sanitizeSettings, settingsSnapshot } = require('./services/settings');
+const { sanitizeSettings, settingsSnapshot, cleanTileName } = require('./services/settings');
 const {
   envMode,
   warmCapture,
@@ -118,11 +118,19 @@ function basicItems(tileId, limit) {
   }));
 }
 
+function tileDisplayName(tile, data) {
+  const custom = cleanTileName(tile && tile.name);
+  if (custom) return custom;
+  return (data && data.name) || path.basename(tile.folder);
+}
+
 function buildTilePayload(tile) {
   const data = stateOf(tile.id);
   return {
     tileId: tile.id,
     folderName: (data && data.name) || path.basename(tile.folder),
+    displayName: tileDisplayName(tile, data),
+    size: tile.size,
     folder: tile.folder,
     items: basicItems(tile.id, 4),
     total: (data && data.total) || 0,
@@ -145,6 +153,7 @@ function buildOverlayPayload(tile) {
       height: Math.max(1, bounds.height - LABEL_HEIGHT)
     },
     folderName: (data && data.name) || path.basename(tile.folder),
+    displayName: tileDisplayName(tile, data),
     folder: tile.folder,
     items: basicItems(tile.id),
     total: (data && data.total) || 0,
@@ -158,10 +167,10 @@ function buildOverlayPayload(tile) {
   };
 }
 
-async function refreshTile(tileId) {
+// 只推送当前状态（不重新扫描），用于改名字这类纯配置变化
+function pushTileState(tileId) {
   const tile = tileById(tileId);
   if (!tile) return;
-  await loadFolderState(tileId);
   const win = tileWindows.get(tileId);
   if (win && !win.isDestroyed()) {
     win.webContents.send('tile:refresh', buildTilePayload(tile));
@@ -169,6 +178,13 @@ async function refreshTile(tileId) {
   if (overlay && overlay.isOpen && overlayTileId === tileId && overlay.win) {
     overlay.win.webContents.send('overlay:refresh', buildOverlayPayload(tile));
   }
+}
+
+async function refreshTile(tileId) {
+  const tile = tileById(tileId);
+  if (!tile) return;
+  await loadFolderState(tileId);
+  pushTileState(tileId);
 }
 
 /* ------------------------------------------------------------------ */
@@ -450,7 +466,7 @@ async function removeTile(tileId) {
   const rest = config.tiles.filter((tile) => tile.id !== tileId);
   if (rest.length === 0) return;
   await applySettings({
-    tiles: rest.map((tile) => ({ folder: tile.folder, x: tile.x, y: tile.y, size: tile.size })),
+    tiles: rest.map((tile) => ({ folder: tile.folder, x: tile.x, y: tile.y, size: tile.size, name: tile.name })),
     overlay: config.overlay,
     app: config.app
   });
@@ -477,6 +493,20 @@ function registerIpc() {
   ipcMain.on('tile:hover', (event) => {
     if (!senderTileId(event)) return;
     warmBackground();
+  });
+
+  ipcMain.handle('tile:rename', (event, rawName) => {
+    const tileId = senderTileId(event)
+      || (overlay && overlay.win && event.sender === overlay.win.webContents ? overlayTileId : null);
+    const tile = tileId ? tileById(tileId) : null;
+    if (!tile) return { ok: false, error: '找不到瓦片' };
+    const name = cleanTileName(rawName);
+    if (name) tile.name = name;
+    else delete tile.name;
+    saveConfig(config);
+    pushTileState(tile.id);
+    log('tile renamed:', tile.id, JSON.stringify(name));
+    return { ok: true, displayName: tileDisplayName(tile, stateOf(tile.id)) };
   });
 
   ipcMain.handle('icons:get', async (event, item) => {
@@ -791,4 +821,5 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+
 

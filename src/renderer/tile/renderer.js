@@ -12,6 +12,8 @@ const GLYPH_BY_EXT = {
   mp4: '🎬', mkv: '🎬', mov: '🎬', avi: '🎬', webm: '🎬',
   mp3: '🎵', wav: '🎵', flac: '🎵'
 };
+let tileSize = 84;
+
 const THUMB_EXT = new Set([
   'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif', 'ico',
   'mp4', 'mkv', 'mov', 'avi', 'webm', 'wmv', 'flv'
@@ -56,11 +58,18 @@ function loadIcon(item, el, glyph) {
     // inline background 简写会重置 background-size，这里必须明确写回
     el.style.background = 'transparent';
     el.style.backgroundImage = `url("${payload.dataUrl}")`;
-    el.style.backgroundSize = payload.kind === 'thumb' ? 'cover' : '26px 26px';
+    const iconPx = Math.round(tileSize * 0.31);
+    el.style.backgroundSize = payload.kind === 'thumb' ? 'cover' : `${iconPx}px ${iconPx}px`;
     el.style.backgroundPosition = 'center';
     el.style.backgroundRepeat = 'no-repeat';
     glyph.remove();
   }).catch(() => { /* ignore */ });
+}
+
+function applyTileSize(size) {
+  const value = Math.min(Math.max(Math.round(Number(size) || 84), 64), 128);
+  tileSize = value;
+  document.documentElement.style.setProperty('--tile-size', `${value}px`);
 }
 
 function renderThumb(item) {
@@ -79,8 +88,9 @@ let currentLabel = '文件夹';
 let feedbackTimer = null;
 
 function render(data) {
+  applyTileSize(data.size);
   const isError = Boolean(data.error);
-  currentLabel = isError ? '读取失败' : (data.folderName || '文件夹');
+  currentLabel = isError ? '读取失败' : (data.displayName || data.folderName || '文件夹');
   if (!feedbackTimer) labelEl.textContent = currentLabel;
 
   thumbsEl.textContent = '';
@@ -224,3 +234,4 @@ document.addEventListener('drop', async (event) => {
   const summary = await window.phoneFolder.dropFiles(paths);
   flashResult(summary);
 });
+

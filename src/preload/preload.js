@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   onOverlayRefresh: (cb) => ipcRenderer.on('overlay:refresh', (_event, data) => cb(data)),
   onOverlayClose: (cb) => ipcRenderer.on('overlay:close', () => cb()),
   notifyOverlayHidden: () => ipcRenderer.send('overlay:hidden'),
+  renameTile: (name) => ipcRenderer.invoke('tile:rename', name),
 
   // 文件/图标
   getIcon: (item) => ipcRenderer.invoke('icons:get', item),
@@ -43,3 +44,4 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   getPathForFile: (file) => webUtils.getPathForFile(file),
   log: (...args) => ipcRenderer.send('log', args.map(String).join(' '))
 });
+

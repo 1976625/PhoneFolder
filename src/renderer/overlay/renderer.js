@@ -79,6 +79,11 @@ function extOf(name) {
   return idx > 0 ? String(name).slice(idx + 1).toLowerCase() : '';
 }
 
+// 面板里隐藏快捷方式的 .lnk 后缀（文件本身不改名）
+function displayItemName(name) {
+  return String(name || '').replace(/\.lnk$/i, '');
+}
+
 function glyphFor(item) {
   if (item.isDir) return '📁';
   return GLYPH_BY_EXT[extOf(item.name)] || '📄';
@@ -107,6 +112,74 @@ function renderHead(folderName) {
   eyebrowEl.textContent = eyebrow;
   titleEl.textContent = folderName || '文件夹';
 }
+
+/* ---------------------------- 重命名瓦片 ---------------------------- */
+let titleInput = null;
+
+function cancelTitleEdit() {
+  if (!titleInput) return;
+  titleInput.remove();
+  titleInput = null;
+  titleEl.style.display = '';
+}
+
+function finishTitleEdit(commit) {
+  if (!titleInput) return;
+  const value = titleInput.value;
+  cancelTitleEdit();
+  if (!commit) {
+    renderHead(folderNameRef);
+    return;
+  }
+  const name = String(value || '').trim().slice(0, 24);
+  window.phoneFolder.renameTile(name).then((result) => {
+    if (!result || !result.ok) {
+      showToastText((result && result.error) || '重命名失败');
+      renderHead(folderNameRef);
+      return;
+    }
+    folderNameRef = result.displayName || name || folderNameRef;
+    dropFolderEl.textContent = folderNameRef;
+    renderHead(folderNameRef);
+  }).catch(() => {
+    showToastText('重命名失败');
+    renderHead(folderNameRef);
+  });
+}
+
+function startTitleEdit() {
+  if (titleInput || !isOpen) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'title-input';
+  input.maxLength = 24;
+  input.spellcheck = false;
+  input.value = folderNameRef || '文件夹';
+  titleInput = input;
+  titleEl.style.display = 'none';
+  titleEl.parentNode.insertBefore(input, titleEl);
+  input.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      finishTitleEdit(true);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      finishTitleEdit(false);
+    }
+  });
+  input.addEventListener('blur', () => { if (titleInput) finishTitleEdit(true); });
+  input.addEventListener('mousedown', (event) => event.stopPropagation());
+  input.addEventListener('click', (event) => event.stopPropagation());
+  input.focus();
+  input.select();
+}
+
+titleEl.title = '点击重命名';
+titleEl.addEventListener('click', (event) => {
+  event.stopPropagation();
+  startTitleEdit();
+});
 
 function renderDots() {
   dotsEl.textContent = '';
@@ -177,7 +250,7 @@ function itemEl(item, index) {
 
   const name = document.createElement('span');
   name.className = 'name';
-  name.textContent = item.name;
+  name.textContent = displayItemName(item.name);
 
   btn.append(icon, name);
   btn.addEventListener('click', (event) => {
@@ -286,7 +359,7 @@ function applyPayload(data) {
   error = data.error || null;
   errorMessage = data.errorMessage || null;
   truncated = Boolean(data.truncated);
-  folderNameRef = data.folderName || '文件夹';
+  folderNameRef = data.displayName || data.folderName || '文件夹';
   dropFolderEl.textContent = folderNameRef;
   page = 0;
 }
@@ -300,6 +373,7 @@ function applyLook(dim, blur) {
 
 function openOverlay(data) {
   if (isOpen && !isClosing) return;
+  cancelTitleEdit();
   if (closeTimer) {
     clearTimeout(closeTimer);
     closeTimer = null;
@@ -359,6 +433,7 @@ function onRefresh(data) {
 
 function closeOverlay() {
   if (!isOpen || isClosing) return;
+  cancelTitleEdit();
   isClosing = true;
   panelEl.classList.remove('items-in');
   panelEl.style.transition = `transform ${CLOSE_MS}ms cubic-bezier(0.4, 0, 1, 1), opacity 200ms ease-in`;
@@ -413,6 +488,17 @@ document.addEventListener('mousedown', (event) => {
 /* ---------------------------- 拖入移入 ---------------------------- */
 let toastTimer = null;
 
+function showToastText(text) {
+  if (!text) return;
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastTimer = null;
+    toastEl.classList.remove('show');
+  }, 2200);
+}
+
 function showToast(summary) {
   if (!summary) return;
   const moved = Number(summary.moved) || 0;
@@ -423,13 +509,7 @@ function showToast(summary) {
   else if (skipped > 0) text = `${moved} 项已移入（${skipped} 项已在文件夹内）`;
   else text = `已移入 ${moved} 项`;
   if (summary.error) text = `移入失败：${summary.error}`;
-  toastEl.textContent = text;
-  toastEl.classList.add('show');
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toastTimer = null;
-    toastEl.classList.remove('show');
-  }, 2200);
+  showToastText(text);
 }
 
 function hasFiles(event) {
@@ -476,5 +556,7 @@ document.addEventListener('drop', async (event) => {
   const summary = await window.phoneFolder.dropFiles(paths);
   showToast(summary);
 });
+
+
 
 

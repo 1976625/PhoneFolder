@@ -6,7 +6,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 交互对标付费软件 DeskFolders，本项目免费自研。定位：不替代资源管理器，只在桌面上加一层「文件夹入口 + 展开层」。
 
-**当前版本：v0.7.1**（便携版已产出）。
+**当前版本：v0.8.0**（便携版已产出）。
 
 ## 当前进度
 
@@ -21,18 +21,19 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 | v0.6 行为修正 | ✅ 完成 | 默认空瓦片 + 从桌面拖入收纳（旧配置自动迁移）；空瓦片去图标、面板同款实线玻璃边；修复二次打开不居中 |
 | v0.7 收纳位置 | ✅ 完成 | 收纳文件夹移出桌面（放到桌面同级，如同盘 `D:\手机文件夹`）；旧隐藏目录自动迁移清空，开「显示隐藏项目」也不会出现在桌面 |
 | v0.7.1 图标修复 | ✅ 完成 | `.lnk` / `.exe` 显示真实软件图标（解析快捷方式目标 + `ExtractAssociatedIcon` 批量取图，缓存 + 扫描预热） |
+| v0.8 交互细节 | ✅ 完成 | 修复 hover 顶部裁切、瓦片大小真正生效；点浮层标题重命名；面板隐藏 `.lnk` 后缀 |
 
 - 开发计划：[docs/开发计划.md](docs/开发计划.md)
-- 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md) · [v0.7](docs/v0.7-进展.md)
+- 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md) · [v0.7](docs/v0.7-进展.md) · [v0.8](docs/v0.8-进展.md)
 
 ## 发布 / 直接使用
 
 | 产物 | 大小 | 用法 |
 |---|---|---|
-| `release/PhoneFolder-0.7.1-portable.exe` | 93.5 MB | **双击即用**（自解压到临时目录运行） |
-| `release/PhoneFolder-0.7.1-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
+| `release/PhoneFolder-0.8.0-portable.exe` | 93.5 MB | **双击即用**（自解压到临时目录运行） |
+| `release/PhoneFolder-0.8.0-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
 
-- SHA-256 前 16 位：portable `AF18A69F5644C5DB` · zip `19D73FA55507B091`
+- SHA-256 前 16 位：portable `9ADB60E7394E0692` · zip `D198BAC5E54B9882`
 - 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
 - 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
 - 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
@@ -77,6 +78,8 @@ pnpm dist            # zip + portable，输出到 release/
 - **拖动瓦片**：移动位置并写回配置
 - **右键瓦片**：展开 / 打开绑定文件夹 / 重新扫描 / 添加瓦片 / 设置 / 删除此瓦片（多瓦片时）/ 退出
 - **浮层**：滚轮 / ←→ / 左右滑动翻页；单击条目打开（资源管理器），浮层自动收起；右键条目有「打开 / 在资源管理器中显示 / 复制路径」
+- **重命名**：点浮层里的大标题 → 直接输入，Enter 保存 / Esc 取消；清空则恢复文件夹名（最长 24 字）
+- **显示名**：面板里快捷方式不显示 `.lnk` 后缀（文件本身不改名）；瓦片大小设置现在会真正改变图标卡片尺寸（64–128）
 - **拖入（收纳）**：从桌面/资源管理器拖文件、快捷方式、文件夹到瓦片或浮层 → 移入瓦片绑定的文件夹（高亮 + 提示 + toast；重名自动 `(n)`；已在文件夹内跳过）
 - **快捷方式图标**：`.lnk` / `.exe` 显示软件真实图标（解析快捷方式目标后取图标，首次批量约 0.5–1.2s，之后缓存秒开）
 - **拖出**：浮层条目拖到资源管理器/桌面 → 移出（Electron 原生拖拽，单文件限制）
@@ -88,10 +91,11 @@ pnpm dist            # zip + portable，输出到 release/
 ## 测试
 
 ```powershell
-pnpm test                        # 排序/过滤/移入/设置校验/配置迁移单测（11 项）
+pnpm test                        # 排序/过滤/移入/设置校验/配置迁移单测（13 项）
 node scripts/e2e-drop.js         # E2E：桌面文件拖入瓦片（CDP 调真实 IPC）
 node scripts/e2e-settings.js     # E2E：多瓦片 + 自启注册表 + 设置窗口（结束会还原原配置）
 node scripts/diag-center.js      # 回归：连续打开浮层是否始终居中
+node scripts/e2e-rename.js       # E2E：点标题重命名 + 隐藏 .lnk 后缀
 ```
 
 ## 配置
@@ -102,7 +106,7 @@ node scripts/diag-center.js      # 回归：连续打开浮层是否始终居中
 {
   "version": 4,
   "tiles": [
-    { "id": "t1", "folder": "D:\\手机文件夹", "x": 1800, "y": 0, "size": 120, "opacity": 1 }
+    { "id": "t1", "name": "我的收纳盒", "folder": "D:\\手机文件夹", "x": 1792, "y": 24, "size": 128, "opacity": 1 }
   ],
   "overlay": { "columns": 3, "rows": 3, "dim": 0.42, "blur": 26, "theme": "dark", "background": "wallpaper" },
   "behavior": { "openOnSingleClick": true },
@@ -110,6 +114,7 @@ node scripts/diag-center.js      # 回归：连续打开浮层是否始终居中
 }
 ```
 
+- `tiles[].name` 可选：自定义显示名（浮层点标题重命名写入，空则显示文件夹名）
 - v2 → v3：绑定桌面的瓦片改绑收纳文件夹
 - v3 → v4：桌面内隐藏收纳目录（旧默认「手机文件夹」/隐藏目录）迁到桌面同级的 `手机文件夹`，内容合并搬迁
 - 瓦片位置拖动自动写回；设置页保存时统一重编号 `t1..tN`
@@ -164,4 +169,5 @@ D:\deskTop\phoneS\
 - 默认收纳目录在桌面同级；若你手动把它改成桌面里的文件夹，它会正常显示在桌面上（这是你的显式选择）
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件
 - 多显示器未适配；瓦片大小是全局设置
+
 

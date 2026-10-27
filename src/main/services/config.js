@@ -6,7 +6,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { app, screen } = require('electron');
 const { log } = require('./logger');
-const { migrateConfig, CONFIG_VERSION, isSamePath } = require('./settings');
+const { migrateConfig, CONFIG_VERSION, isSamePath, cleanTileName } = require('./settings');
 
 const DEFAULT_TILE_SIZE = 84;
 const TILE_LABEL_HEIGHT = 20; // 图标下方标签占位
@@ -136,13 +136,17 @@ function clampTile(tile, index, displayBounds) {
   let y = Number.isFinite(tile.y) ? tile.y : fallback.y;
   x = Math.min(Math.max(x, displayBounds.x), displayBounds.x + displayBounds.width - size);
   y = Math.min(Math.max(y, displayBounds.y), displayBounds.y + displayBounds.height - size - TILE_LABEL_HEIGHT);
-  return {
+  const cleaned = {
     ...tile,
     id: typeof tile.id === 'string' && tile.id ? tile.id : `t${index + 1}`,
     x: Math.round(x),
     y: Math.round(y),
     size: Math.round(size)
   };
+  const name = cleanTileName(cleaned.name);
+  if (name) cleaned.name = name;
+  else delete cleaned.name;
+  return cleaned;
 }
 
 // 桌面下直接子文件夹：属于我们旧的收纳位置（隐藏目录或旧默认名）才迁移
@@ -261,3 +265,4 @@ module.exports = {
   STORAGE_FOLDER_NAME,
   storageFolderPath
 };
+

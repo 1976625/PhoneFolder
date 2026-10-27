@@ -22,6 +22,12 @@ function isSamePath(a, b) {
   }
 }
 
+// 瓦片自定义名称：去换行/多余空格，最长 24 字；空字符串表示恢复默认（文件夹名）
+function cleanTileName(value) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 24);
+}
+
 // v2/v3 → v4：
 //  - v2 默认绑定桌面的瓦片 → 改为独立收纳目录
 //  - v3 绑定在桌面下的隐藏收纳文件夹（或旧默认「手机文件夹」）→ 改为独立收纳目录
@@ -81,7 +87,8 @@ function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTi
     const x = Math.round(clamp(Number.isFinite(rawX) ? rawX : maxX - 24, bounds.x, maxX, maxX - 24));
     const y = Math.round(clamp(Number.isFinite(rawY) ? rawY : bounds.y + 24, bounds.y, maxY, bounds.y + 24));
 
-    tiles.push({ id: `t${tiles.length + 1}`, folder, x, y, size, opacity: 1 });
+    const name = cleanTileName(raw.name);
+    tiles.push({ id: `t${tiles.length + 1}`, folder, x, y, size, opacity: 1, ...(name ? { name } : {}) });
   }
 
   if (tiles.length === 0) throw new Error('至少保留一个瓦片');
@@ -116,5 +123,7 @@ module.exports = {
   BACKGROUND_MODES,
   MAX_TILES,
   CONFIG_VERSION,
-  isSamePath
+  isSamePath,
+  cleanTileName
 };
+

@@ -170,7 +170,8 @@ function wireInputs() {
         folder: tile.folder,
         x: tile.x,
         y: tile.y,
-        size: tile.size
+        size: tile.size,
+        name: tile.name
       })),
       overlay: { ...draft.overlay },
       app: { launchAtLogin: $('autostart').checked }
@@ -199,3 +200,4 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (data) loadSnapshot(data);
   }
 });
+

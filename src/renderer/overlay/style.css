@@ -295,3 +295,31 @@ body.drop-active .drop-hint {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/* 标题可点击重命名 */
+.title {
+  cursor: text;
+}
+
+.title:hover {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.title-input {
+  display: block;
+  width: 100%;
+  margin: 4px 0 20px;
+  padding: 0 4px;
+  font-family: inherit;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-bottom: 2px solid rgba(150, 220, 255, 0.9);
+  border-radius: 4px;
+  outline: none;
+  box-sizing: border-box;
+}
