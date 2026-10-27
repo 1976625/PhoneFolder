@@ -43,10 +43,85 @@ function remember(key, value) {
   }
 }
 
-async function thumbnailFor(file) {
+// Windows 的文件夹缩略图有时会返回不带 alpha 的 RGB 位图，背景是一整块纯黑；
+// 直接显示就是「黑底方块」，与其它半透明图标不统一。
+// 这里从四边向内做一次黑色像素漫水填充，把和边界连通的纯黑背景抠成透明（文件夹内部的黑色不动）。
+const BLACK_THRESHOLD = 26;
+
+function keyOutOpaqueBlack(image) {
   try {
-    const thumb = await nativeImage.createThumbnailFromPath(file, THUMBNAIL_SIZE);
-    if (thumb && !thumb.isEmpty()) return thumb.toDataURL();
+    const size = image.getSize();
+    const width = size.width;
+    const height = size.height;
+    if (!width || !height) return image;
+    const bitmap = image.toBitmap(); // BGRA
+    const index = (x, y) => (y * width + x) * 4;
+    const isBlack = (offset) => (
+      bitmap[offset + 3] === 255
+      && bitmap[offset] <= BLACK_THRESHOLD
+      && bitmap[offset + 1] <= BLACK_THRESHOLD
+      && bitmap[offset + 2] <= BLACK_THRESHOLD
+    );
+
+    // 先判断边框是否几乎都是不透明黑（否则是正常带透明的缩略图，直接返回）
+    let borderTotal = 0;
+    let borderBlack = 0;
+    const visitBorder = (x, y) => {
+      const offset = index(x, y);
+      borderTotal += 1;
+      if (isBlack(offset)) borderBlack += 1;
+    };
+    for (let x = 0; x < width; x += 1) {
+      visitBorder(x, 0);
+      visitBorder(x, height - 1);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      visitBorder(0, y);
+      visitBorder(width - 1, y);
+    }
+    if (borderTotal === 0 || borderBlack / borderTotal < 0.6) return image;
+
+    const visited = new Uint8Array(width * height);
+    const stack = [];
+    const push = (x, y) => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return;
+      const cell = y * width + x;
+      if (visited[cell]) return;
+      const offset = cell * 4;
+      if (!isBlack(offset)) return;
+      visited[cell] = 1;
+      stack.push([x, y]);
+    };
+    for (let x = 0; x < width; x += 1) {
+      push(x, 0);
+      push(x, height - 1);
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      push(0, y);
+      push(width - 1, y);
+    }
+    while (stack.length > 0) {
+      const [x, y] = stack.pop();
+      const offset = index(x, y);
+      bitmap[offset + 3] = 0;
+      push(x + 1, y);
+      push(x - 1, y);
+      push(x, y + 1);
+      push(x, y - 1);
+    }
+    return nativeImage.createFromBitmap(bitmap, { width, height });
+  } catch {
+    return image;
+  }
+}
+
+async function thumbnailFor(file, { keyBlackBackground = false } = {}) {
+  try {
+    let thumb = await nativeImage.createThumbnailFromPath(file, THUMBNAIL_SIZE);
+    if (thumb && !thumb.isEmpty()) {
+      if (keyBlackBackground) thumb = keyOutOpaqueBlack(thumb);
+      return thumb.toDataURL();
+    }
   } catch { /* fall through */ }
   return null;
 }
@@ -81,7 +156,7 @@ async function payloadForItem(item) {
 
   // 文件夹 / 图片 / 视频：优先缩略图（文件夹缩略图比 32px 图标清晰得多）
   if (item.isDir || THUMBNAIL_EXT.has(ext)) {
-    const dataUrl = await thumbnailFor(item.path);
+    const dataUrl = await thumbnailFor(item.path, { keyBlackBackground: item.isDir });
     if (dataUrl) payload = { dataUrl, kind: 'thumb' };
   }
 
@@ -100,4 +175,5 @@ function clearCache() {
 }
 
 module.exports = { payloadForItem, clearCache, prefetchShortcutIcons };
+
 
