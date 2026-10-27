@@ -3,10 +3,11 @@
 // 瓦片网格：固定 128px 瓦片 + 桌面图标风格的网格吸附
 const TILE_SIZE = 128;
 const LABEL_HEIGHT = 20;
-const GRID_GAP = 8; // 瓦片之间的间隔（用户要求缩小一半）
 const GRID_PAD = 8;
-const CELL_W = TILE_SIZE + GRID_GAP; // 136
-const CELL_H = TILE_SIZE + LABEL_HEIGHT + GRID_GAP; // 156
+// 窗口 128×148，卡片实际 122×122；单元格比窗口略小/相等，让上下瓦片更紧凑：
+// 水平：卡片之间约 8px；垂直：上一个的字幕底部到下一个卡片约 6px（窗口刚好相接）
+const CELL_W = 130;
+const CELL_H = 148;
 
 function num(value, fallback) {
   const n = Number(value);
@@ -93,7 +94,7 @@ function occupiedFromPositions(positions, metrics) {
 module.exports = {
   TILE_SIZE,
   LABEL_HEIGHT,
-  GRID_GAP,
+
   GRID_PAD,
   CELL_W,
   CELL_H,
@@ -105,6 +106,7 @@ module.exports = {
   snapPosition,
   occupiedFromPositions
 };
+
 
 
 

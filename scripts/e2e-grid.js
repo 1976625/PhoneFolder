@@ -9,10 +9,10 @@ const APP = path.join(__dirname, '..');
 const EXE = process.env.PF_APP_EXE || path.join(APP, 'node_modules', 'electron', 'dist', 'electron.exe');
 const CONFIG = path.join(process.env.APPDATA || '', 'phone-folder', 'config.json');
 const PORT = 9227;
-const ORIGIN_X = 152; // 横向右对齐后的最左列（workArea 48 + 8 + 96 余量）
+const ORIGIN_X = 94; // 横向右对齐后的最左列
 const ORIGIN_Y = 8;
-const CELL_W = 136;
-const CELL_H = 156;
+const CELL_W = 130;
+const CELL_H = 148;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function readConfig() {
@@ -121,5 +121,6 @@ function evaluate(target, expression) {
   console.error(err && err.stack ? err.stack : String(err));
   process.exit(1);
 });
+
 
 

@@ -69,7 +69,10 @@ function loadIcon(item, el, glyph) {
 function applyTileSize(size) {
   const value = Math.min(Math.max(Math.round(Number(size) || 84), 64), 128);
   tileSize = value;
+  // 注意：CSS 在 html,body 上声明了 --tile-size 默认值，如果只写 documentElement 会被 body 上的声明覆盖，
+  // 卡片就一直是 84px（看起来「没生效」）。这里两处都写，保证 .thumbs 真正按尺寸渲染。
   document.documentElement.style.setProperty('--tile-size', `${value}px`);
+  if (document.body) document.body.style.setProperty('--tile-size', `${value}px`);
 }
 
 function renderThumb(item) {
@@ -234,6 +237,7 @@ document.addEventListener('drop', async (event) => {
   const summary = await window.phoneFolder.dropFiles(paths);
   flashResult(summary);
 });
+
 
 
 
