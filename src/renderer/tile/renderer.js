@@ -96,10 +96,7 @@ function render(data) {
   }
 
   if (!data.items || data.items.length === 0) {
-    const glyph = document.createElement('span');
-    glyph.className = 'tile-glyph';
-    glyph.textContent = '📂';
-    thumbsEl.appendChild(glyph);
+    // 空瓦片：只保留虚线框（用户反馈不需要文件夹图标）
     return;
   }
 
