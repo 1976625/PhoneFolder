@@ -1,11 +1,11 @@
 'use strict';
 
-// 设置校验：文件夹存在、绝对路径、去重、最多 6 个瓦片；数值夹取
+// 设置校验 + 配置迁移（v2/v3 → v4：收纳文件夹从桌面迁到桌面同级的独立目录）
 const path = require('path');
 
 const BACKGROUND_MODES = ['wallpaper', 'capture', 'acrylic'];
 const MAX_TILES = 6;
-const CONFIG_VERSION = 3;
+const CONFIG_VERSION = 4;
 
 function clamp(value, min, max, fallback) {
   const number = Number(value);
@@ -22,24 +22,35 @@ function isSamePath(a, b) {
   }
 }
 
-// v2 → v3：旧的「默认绑定桌面」迁移成「空瓦片」（绑定到隐藏收纳文件夹）
-function migrateConfig(raw, { desktopPath, replacementFolder }) {
-  if (!raw || typeof raw !== 'object') return { config: raw, changed: false, rebound: false };
+// v2/v3 → v4：
+//  - v2 默认绑定桌面的瓦片 → 改为独立收纳目录
+//  - v3 绑定在桌面下的隐藏收纳文件夹（或旧默认「手机文件夹」）→ 改为独立收纳目录
+//  - 用户绑定的普通可见文件夹保持不变
+function migrateConfig(raw, { desktopPath, replacementFolder, shouldRelocate } = {}) {
+  if (!raw || typeof raw !== 'object') {
+    return { config: raw, changed: false, relocated: [] };
+  }
   const version = Number(raw.version) || 0;
-  if (version >= CONFIG_VERSION) return { config: raw, changed: false, rebound: false };
+  if (version >= CONFIG_VERSION) {
+    return { config: raw, changed: false, relocated: [] };
+  }
 
   const config = JSON.parse(JSON.stringify(raw));
-  let rebound = false;
+  const decide = typeof shouldRelocate === 'function'
+    ? shouldRelocate
+    : (folder) => isSamePath(folder, desktopPath);
+
+  const relocated = [];
   if (Array.isArray(config.tiles)) {
     for (const tile of config.tiles) {
-      if (tile && isSamePath(tile.folder, desktopPath)) {
+      if (tile && typeof tile.folder === 'string' && decide(tile.folder)) {
+        relocated.push(tile.folder);
         tile.folder = replacementFolder;
-        rebound = true;
       }
     }
   }
   config.version = CONFIG_VERSION;
-  return { config, changed: true, rebound };
+  return { config, changed: true, relocated };
 }
 
 function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTiles = MAX_TILES }) {
@@ -98,5 +109,12 @@ function settingsSnapshot(config) {
   };
 }
 
-module.exports = { sanitizeSettings, settingsSnapshot, migrateConfig, BACKGROUND_MODES, MAX_TILES, CONFIG_VERSION };
-
+module.exports = {
+  sanitizeSettings,
+  settingsSnapshot,
+  migrateConfig,
+  BACKGROUND_MODES,
+  MAX_TILES,
+  CONFIG_VERSION,
+  isSamePath
+};

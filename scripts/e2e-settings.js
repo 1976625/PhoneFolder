@@ -5,7 +5,10 @@
 const path = require('path');
 const { spawn, execFileSync } = require('child_process');
 
+const fs = require('fs');
 const APP = path.join(__dirname, '..');
+const CONFIG = path.join(process.env.APPDATA || '', 'phone-folder', 'config.json');
+const ORIGINAL = JSON.parse(fs.readFileSync(CONFIG, 'utf8'));
 const EXE = path.join(APP, 'node_modules', 'electron', 'dist', 'electron.exe');
 const PORT = 9222;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,17 +59,17 @@ function evaluate(target, expression) {
 
 const TWO_TILE_INPUT = {
   tiles: [
-    { folder: 'D:\\deskTop', x: 1812, y: 24, size: 84 },
-    { folder: 'D:\\deskTop\\phoneS', x: 1600, y: 220, size: 96 }
+    { folder: ORIGINAL.tiles[0].folder, x: ORIGINAL.tiles[0].x, y: ORIGINAL.tiles[0].y, size: ORIGINAL.tiles[0].size },
+    { folder: 'D:\\\\deskTop\\\\phoneS', x: 1600, y: 220, size: 96 }
   ],
   overlay: { dim: 0.46, blur: 30, background: 'wallpaper' },
   app: { launchAtLogin: true }
 };
 
 const SINGLE_TILE_INPUT = {
-  tiles: [{ folder: 'D:\\deskTop', x: 1812, y: 24, size: 84 }],
-  overlay: { dim: 0.42, blur: 26, background: 'wallpaper' },
-  app: { launchAtLogin: false }
+  tiles: ORIGINAL.tiles.map((tile) => ({ folder: tile.folder, x: tile.x, y: tile.y, size: tile.size })),
+  overlay: ORIGINAL.overlay,
+  app: { launchAtLogin: Boolean(ORIGINAL.app && ORIGINAL.app.launchAtLogin) }
 };
 
 function runPowerShell(scriptName, extraArgs = []) {
@@ -136,3 +139,4 @@ function inspectState() {
   console.error(err && err.stack ? err.stack : String(err));
   process.exit(1);
 });
+

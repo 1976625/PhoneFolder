@@ -147,7 +147,7 @@ test('sanitizeSettings 最多 6 个瓦片', () => {
   assert.strictEqual(out.tiles.length, 6);
 });
 
-test('migrateConfig v2 的「绑定桌面」迁移成空瓦片', () => {
+test('migrateConfig v2 的「绑定桌面」迁移到独立收纳目录', () => {
   const raw = {
     version: 2,
     tiles: [
@@ -159,18 +159,37 @@ test('migrateConfig v2 的「绑定桌面」迁移成空瓦片', () => {
   };
   const result = migrateConfig(raw, {
     desktopPath: 'D:\\deskTop',
-    replacementFolder: 'D:\\deskTop\\手机文件夹'
+    replacementFolder: 'D:\\手机文件夹'
   });
   assert.strictEqual(result.changed, true);
-  assert.strictEqual(result.rebound, true);
-  assert.strictEqual(result.config.version, 3);
-  assert.strictEqual(result.config.tiles[0].folder, 'D:\\deskTop\\手机文件夹');
+  assert.strictEqual(result.config.version, 4);
+  assert.deepStrictEqual(result.relocated, ['D:\\deskTop']);
+  assert.strictEqual(result.config.tiles[0].folder, 'D:\\手机文件夹');
   assert.strictEqual(result.config.tiles[0].x, 10);
   assert.strictEqual(result.config.tiles[1].folder, 'D:\\Custom\\Folder');
 });
 
-test('migrateConfig 已是 v3 时不做改动', () => {
-  const raw = { version: 3, tiles: [{ folder: 'D:\\deskTop' }] };
+test('migrateConfig v3 的隐藏桌面收纳文件夹迁移到独立目录', () => {
+  const raw = {
+    version: 3,
+    tiles: [
+      { folder: 'D:\\deskTop\\文件夹', x: 1, y: 2, size: 84 },
+      { folder: 'D:\\deskTop\\项目demo', x: 3, y: 4, size: 84 }
+    ]
+  };
+  const result = migrateConfig(raw, {
+    desktopPath: 'D:\\deskTop',
+    replacementFolder: 'D:\\手机文件夹',
+    shouldRelocate: (folder) => folder === 'D:\\deskTop\\文件夹'
+  });
+  assert.strictEqual(result.changed, true);
+  assert.deepStrictEqual(result.relocated, ['D:\\deskTop\\文件夹']);
+  assert.strictEqual(result.config.tiles[0].folder, 'D:\\手机文件夹');
+  assert.strictEqual(result.config.tiles[1].folder, 'D:\\deskTop\\项目demo');
+});
+
+test('migrateConfig 已是 v4 时不做改动', () => {
+  const raw = { version: 4, tiles: [{ folder: 'D:\\手机文件夹' }] };
   const result = migrateConfig(raw, { desktopPath: 'D:\\deskTop', replacementFolder: 'X' });
   assert.strictEqual(result.changed, false);
   assert.strictEqual(result.config, raw);

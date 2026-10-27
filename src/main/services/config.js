@@ -1,16 +1,17 @@
 'use strict';
 
-// config.json 读写 + 默认值 + 损坏备份 + 位置夹取 + v2→v3 迁移
+// config.json 读写 + 默认值 + 损坏备份 + 位置夹取 + 配置迁移
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { app, screen } = require('electron');
 const { log } = require('./logger');
-const { migrateConfig, CONFIG_VERSION } = require('./settings');
+const { migrateConfig, CONFIG_VERSION, isSamePath } = require('./settings');
 
 const DEFAULT_TILE_SIZE = 84;
 const TILE_LABEL_HEIGHT = 20; // 图标下方标签占位
-const DEFAULT_FOLDER_NAME = '手机文件夹';
+const STORAGE_FOLDER_NAME = '手机文件夹';
+const LEGACY_FOLDER_NAME = '手机文件夹'; // v3 及更早的默认收纳文件夹名
 
 function defaultTilePosition(size) {
   const b = screen.getPrimaryDisplay().bounds;
@@ -20,25 +21,88 @@ function defaultTilePosition(size) {
   };
 }
 
-// 默认绑定：桌面下的隐藏收纳文件夹（瓦片默认是空的，把桌面文件拖进去即可收纳）
-function ensureDefaultFolder() {
-  const desktop = app.getPath('desktop');
-  const folder = path.join(desktop, DEFAULT_FOLDER_NAME);
+// 收纳文件夹放在「桌面目录的同级」，这样：
+//  1) 不在桌面上，无论是否显示隐藏文件都不会出现在桌面；
+//  2) 与桌面同一磁盘，拖入走 rename，不会跨盘复制大文件。
+function storageFolderPath() {
+  try {
+    const desktop = app.getPath('desktop');
+    const parent = path.dirname(desktop);
+    if (path.resolve(parent) === path.resolve(desktop)) {
+      return path.join(app.getPath('documents'), STORAGE_FOLDER_NAME);
+    }
+    return path.join(parent, STORAGE_FOLDER_NAME);
+  } catch {
+    try {
+      return path.join(app.getPath('userData'), STORAGE_FOLDER_NAME);
+    } catch {
+      return path.join(app.getPath('desktop'), STORAGE_FOLDER_NAME);
+    }
+  }
+}
+
+function ensureStorageFolder() {
+  const folder = storageFolderPath();
   try {
     fs.mkdirSync(folder, { recursive: true });
-    try {
-      execFileSync('attrib', ['+h', folder], { windowsHide: true, stdio: 'ignore' });
-    } catch { /* 隐藏属性设置失败不影响使用 */ }
-    return folder;
   } catch (err) {
-    log('create default folder failed:', err.message);
-    try {
-      const fallback = path.join(app.getPath('userData'), DEFAULT_FOLDER_NAME);
-      fs.mkdirSync(fallback, { recursive: true });
-      return fallback;
-    } catch {
-      return desktop;
+    log('create storage folder failed:', err.message);
+  }
+  return folder;
+}
+
+function isHiddenDirectory(folder) {
+  try {
+    if (!fs.statSync(folder).isDirectory()) return false;
+    const out = String(execFileSync('attrib', [folder], { windowsHide: true }));
+    return out.slice(0, 24).toUpperCase().includes('H');
+  } catch {
+    return false;
+  }
+}
+
+function availableNameSync(dir, name) {
+  const ext = path.extname(name);
+  const base = ext ? name.slice(0, -ext.length) : name;
+  let candidate = name;
+  let index = 1;
+  while (fs.existsSync(path.join(dir, candidate))) {
+    candidate = `${base} (${index})${ext}`;
+    index += 1;
+    if (index > 999) break;
+  }
+  return candidate;
+}
+
+// 把旧收纳文件夹里的东西合并进新收纳文件夹，然后删掉空的旧目录
+function relocateFolderContents(oldFolder, newFolder) {
+  if (!oldFolder || !fs.existsSync(oldFolder)) return false;
+  try {
+    if (!fs.statSync(oldFolder).isDirectory()) return false;
+    fs.mkdirSync(newFolder, { recursive: true });
+    let moved = 0;
+    for (const name of fs.readdirSync(oldFolder)) {
+      const src = path.join(oldFolder, name);
+      let dest = path.join(newFolder, name);
+      if (fs.existsSync(dest)) dest = path.join(newFolder, availableNameSync(newFolder, name));
+      try {
+        fs.renameSync(src, dest);
+      } catch (err) {
+        if (err && err.code === 'EXDEV') {
+          fs.cpSync(src, dest, { recursive: true, errorOnExist: true });
+          fs.rmSync(src, { recursive: true, force: true });
+        } else {
+          throw err;
+        }
+      }
+      moved += 1;
     }
+    try { fs.rmdirSync(oldFolder); } catch { /* 非空就保留 */ }
+    log('relocated storage contents:', oldFolder, '->', newFolder, 'items:', moved);
+    return true;
+  } catch (err) {
+    log('relocate storage failed:', oldFolder, err.message);
+    return false;
   }
 }
 
@@ -47,7 +111,7 @@ function baseDefaults() {
   return {
     version: CONFIG_VERSION,
     tiles: [
-      { id: 't1', folder: ensureDefaultFolder(), x: pos.x, y: pos.y, size: DEFAULT_TILE_SIZE, opacity: 1 }
+      { id: 't1', folder: storageFolderPath(), x: pos.x, y: pos.y, size: DEFAULT_TILE_SIZE, opacity: 1 }
     ],
     overlay: { columns: 3, rows: 3, dim: 0.42, blur: 26, theme: 'dark', background: 'wallpaper' },
     behavior: { openOnSingleClick: true },
@@ -81,13 +145,30 @@ function clampTile(tile, index, displayBounds) {
   };
 }
 
+// 桌面下直接子文件夹：属于我们旧的收纳位置（隐藏目录或旧默认名）才迁移
+function shouldRelocateFromDesktop(folder, desktopPath) {
+  if (typeof folder !== 'string' || !folder) return false;
+  if (isSamePath(folder, desktopPath)) return true; // v2 默认绑定桌面
+  let resolved;
+  try {
+    resolved = path.resolve(folder);
+  } catch {
+    return false;
+  }
+  const parent = path.dirname(resolved);
+  if (parent.toLowerCase() !== path.resolve(desktopPath).toLowerCase()) return false;
+  if (path.basename(resolved) === LEGACY_FOLDER_NAME) return true;
+  return isHiddenDirectory(resolved);
+}
+
 function loadConfig() {
   const file = configPath();
+  const hadConfig = fs.existsSync(file);
   const defaults = baseDefaults();
   let raw = null;
 
   try {
-    if (fs.existsSync(file)) {
+    if (hadConfig) {
       raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     }
   } catch (err) {
@@ -98,21 +179,34 @@ function loadConfig() {
     raw = null;
   }
 
-  // v2 → v3：旧的「默认绑定桌面」迁移为「空瓦片 + 隐藏收纳文件夹」
   const desktopPath = app.getPath('desktop');
+  const storageFolder = storageFolderPath();
   let migrated = false;
-  let rebound = false;
+
+  // v2/v3 → v4：收纳文件夹从桌面迁到桌面同级目录
   if (raw && Number(raw.version || 0) < CONFIG_VERSION) {
-    const hasDesktopBinding = Array.isArray(raw.tiles)
-      && raw.tiles.some((tile) => tile && typeof tile.folder === 'string'
-        && path.resolve(tile.folder).toLowerCase() === path.resolve(desktopPath).toLowerCase());
-    const replacementFolder = hasDesktopBinding ? ensureDefaultFolder() : desktopPath;
-    const result = migrateConfig(raw, { desktopPath, replacementFolder });
+    const result = migrateConfig(raw, {
+      desktopPath,
+      replacementFolder: storageFolder,
+      shouldRelocate: (folder) => shouldRelocateFromDesktop(folder, desktopPath)
+    });
     if (result.changed) {
       raw = result.config;
       migrated = true;
-      rebound = result.rebound;
-      log('config migrated to v3, rebound tiles:', rebound, 'folder:', replacementFolder);
+      ensureStorageFolder();
+      for (const oldFolder of result.relocated) {
+        relocateFolderContents(oldFolder, storageFolder);
+      }
+      log('config migrated to v', CONFIG_VERSION, 'relocated:', result.relocated);
+    }
+  }
+
+  // 清理旧默认收纳文件夹（即使已经不在配置里，隐藏目录留在桌面上也会被「显示隐藏项目」看到）
+  const legacyFolder = path.join(desktopPath, LEGACY_FOLDER_NAME);
+  if (!isSamePath(legacyFolder, storageFolder) && fs.existsSync(legacyFolder)) {
+    if (isHiddenDirectory(legacyFolder)) {
+      ensureStorageFolder();
+      relocateFolderContents(legacyFolder, storageFolder);
     }
   }
 
@@ -141,8 +235,10 @@ function loadConfig() {
   merged.overlay.rows = 3;
   merged.overlay.theme = 'dark';
 
+  if (!hadConfig) ensureStorageFolder();
+
   try {
-    if (!fs.existsSync(file) || migrated) writeAtomic(file, merged);
+    if (!hadConfig || migrated) writeAtomic(file, merged);
   } catch (err) {
     log('config write failed:', err.message);
   }
@@ -157,4 +253,11 @@ function saveConfig(merged) {
   }
 }
 
-module.exports = { loadConfig, saveConfig, DEFAULT_TILE_SIZE, TILE_LABEL_HEIGHT, DEFAULT_FOLDER_NAME };
+module.exports = {
+  loadConfig,
+  saveConfig,
+  DEFAULT_TILE_SIZE,
+  TILE_LABEL_HEIGHT,
+  STORAGE_FOLDER_NAME,
+  storageFolderPath
+};
