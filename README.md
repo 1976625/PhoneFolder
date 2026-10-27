@@ -6,7 +6,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 交互对标付费软件 DeskFolders，本项目免费自研。定位：不替代资源管理器，只在桌面上加一层「文件夹入口 + 展开层」。
 
-**当前版本：v0.9.0**（便携版已产出）。
+**当前版本：v0.9.1**（便携版已产出）。
 
 ## 当前进度
 
@@ -22,7 +22,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 | v0.7 收纳位置 | ✅ 完成 | 收纳文件夹移出桌面（放到桌面同级，如同盘 `D:\手机文件夹`）；旧隐藏目录自动迁移清空，开「显示隐藏项目」也不会出现在桌面 |
 | v0.7.1 图标修复 | ✅ 完成 | `.lnk` / `.exe` 显示真实软件图标（解析快捷方式目标 + `ExtractAssociatedIcon` 批量取图，缓存 + 扫描预热） |
 | v0.8 交互细节 | ✅ 完成 | 修复 hover 顶部裁切、瓦片大小真正生效；点浮层标题重命名；面板隐藏 `.lnk` 后缀 |
-| v0.9 拖出与层级 | ✅ 完成 | 拖出改为 pointer 触发原生拖拽（拖到桌面=移出）；瓦片压在软件之下、显示桌面时保持可见 |
+| v0.9 拖出与层级 | ✅ 完成 | 拖出改为 pointer 触发原生拖拽（拖到桌面=移出）；瓦片压在软件之下、显示桌面时保持可见；v0.9.1 修复「只能打开一次」 |
 
 - 开发计划：[docs/开发计划.md](docs/开发计划.md)
 - 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md) · [v0.7](docs/v0.7-进展.md) · [v0.8](docs/v0.8-进展.md) · [v0.9](docs/v0.9-进展.md)
@@ -31,10 +31,10 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 | 产物 | 大小 | 用法 |
 |---|---|---|
-| `release/PhoneFolder-0.9.0-portable.exe` | 93.5 MB | **双击即用**（自解压到临时目录运行） |
-| `release/PhoneFolder-0.9.0-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
+| `release/PhoneFolder-0.9.1-portable.exe` | 93.5 MB | **双击即用**（自解压到临时目录运行） |
+| `release/PhoneFolder-0.9.1-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
 
-- SHA-256 前 16 位：portable `B292870603456AD3` · zip `FF0DC2E658787DC3`
+- SHA-256 前 16 位：portable `68565E6642142F7A` · zip `8250EC51D1DEEAAD`
 - 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
 - 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
 - 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
@@ -99,6 +99,7 @@ node scripts/e2e-settings.js     # E2E：多瓦片 + 自启注册表 + 设置窗
 node scripts/diag-center.js      # 回归：连续打开浮层是否始终居中
 node scripts/e2e-rename.js       # E2E：点标题重命名 + 隐藏 .lnk 后缀
 node scripts/e2e-dragout.js      # E2E：真实鼠标从浮层拖到桌面（拖出）
+node scripts/e2e-reopen.js       # 回归：真实/程序化连续开合浮层 3 次
 ```
 
 ## 配置
@@ -173,6 +174,7 @@ D:\deskTop\phoneS\
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件（拖到桌面会删掉源文件，拖到其它位置是复制）
 - 瓦片层级用前台窗口启发式判断（显示桌面状态保持可见、其它时候压到软件下面）；彻底方案见 P6「真占格」
 - 多显示器未适配；瓦片大小是全局设置
+
 
 
 

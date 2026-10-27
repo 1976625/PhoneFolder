@@ -30,7 +30,7 @@ function createTileWindow(tile, { visible = true } = {}) {
     roundedCorners: false,
     show: false,
     alwaysOnTop: false,
-    focusable: false,
+    focusable: true,
     title: 'PhoneFolder',
     icon: ICON,
     webPreferences: {
@@ -68,5 +68,6 @@ function createTileWindow(tile, { visible = true } = {}) {
 }
 
 module.exports = { createTileWindow, LABEL_HEIGHT };
+
 
 
