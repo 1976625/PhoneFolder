@@ -3,10 +3,10 @@
 // 瓦片网格：固定 128px 瓦片 + 桌面图标风格的网格吸附
 const TILE_SIZE = 128;
 const LABEL_HEIGHT = 20;
-const GRID_GAP = 16;
+const GRID_GAP = 8; // 瓦片之间的间隔（用户要求缩小一半）
 const GRID_PAD = 8;
-const CELL_W = TILE_SIZE + GRID_GAP; // 144
-const CELL_H = TILE_SIZE + LABEL_HEIGHT + GRID_GAP; // 164
+const CELL_W = TILE_SIZE + GRID_GAP; // 136
+const CELL_H = TILE_SIZE + LABEL_HEIGHT + GRID_GAP; // 156
 
 function num(value, fallback) {
   const n = Number(value);
@@ -19,12 +19,14 @@ function gridMetrics(workArea = {}) {
   const y = num(workArea.y, 0);
   const width = Math.max(0, num(workArea.width, 0));
   const height = Math.max(0, num(workArea.height, 0));
-  const originX = x + GRID_PAD;
-  const originY = y + GRID_PAD;
   const usableW = width - GRID_PAD * 2 - TILE_SIZE;
   const usableH = height - GRID_PAD * 2 - (TILE_SIZE + LABEL_HEIGHT);
   const cols = Math.max(1, Math.floor(usableW / CELL_W) + 1);
   const rows = Math.max(1, Math.floor(usableH / CELL_H) + 1);
+  // 横向从右往左排（瓦片习惯放右侧，缩间隔时右边缘不动，只会向左多出列）；
+  // 纵向从顶部往下排（和桌面图标一致）。
+  const originX = x + GRID_PAD + (usableW - (cols - 1) * CELL_W);
+  const originY = y + GRID_PAD;
   return {
     originX,
     originY,
@@ -103,4 +105,6 @@ module.exports = {
   snapPosition,
   occupiedFromPositions
 };
+
+
 

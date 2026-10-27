@@ -165,14 +165,15 @@ test('sanitizeSettings 保留自定义瓦片名', () => {
   assert.strictEqual(out.tiles[0].name, '我的 收纳');
 });
 
-test('gridMetrics 按 workArea 算出网格（任务栏在左 48px）', () => {
+test('gridMetrics 按 workArea 算出网格（间隔 8，横向右对齐）', () => {
   const metrics = grid.gridMetrics({ x: 48, y: 0, width: 1872, height: 1080 });
-  assert.strictEqual(metrics.originX, 56);
   assert.strictEqual(metrics.originY, 8);
-  assert.strictEqual(metrics.cellW, 144);
-  assert.strictEqual(metrics.cellH, 164);
+  assert.strictEqual(metrics.cellW, 136);
+  assert.strictEqual(metrics.cellH, 156);
   assert.strictEqual(metrics.cols, 13);
   assert.strictEqual(metrics.rows, 6);
+  // 最右列 = workArea 右边 - 8 - 128
+  assert.strictEqual(metrics.originX + (metrics.cols - 1) * metrics.cellW, 1784);
 });
 
 test('nearestCell 把任意坐标吸附到最近网格', () => {
@@ -180,14 +181,14 @@ test('nearestCell 把任意坐标吸附到最近网格', () => {
   const cell = grid.nearestCell(1792, 18, metrics);
   assert.deepStrictEqual(cell, { col: 12, row: 0, x: 1784, y: 8 });
   const clamped = grid.nearestCell(-100, -100, metrics);
-  assert.deepStrictEqual(clamped, { col: 0, row: 0, x: 56, y: 8 });
+  assert.deepStrictEqual(clamped, { col: 0, row: 0, x: 152, y: 8 });
 });
 
 test('snapPosition 在格子被占用时找最近的空格', () => {
   const metrics = grid.gridMetrics({ x: 48, y: 0, width: 1872, height: 1080 });
   const occupied = new Set(['12:0']);
   const snapped = grid.snapPosition(1792, 18, metrics, occupied);
-  assert.deepStrictEqual(snapped, { col: 11, row: 0, x: 1640, y: 8 });
+  assert.deepStrictEqual(snapped, { col: 11, row: 0, x: 1648, y: 8 });
 });
 
 test('applyCustomOrder 按自定义顺序排列，未知项保持默认顺序追加', () => {
@@ -303,6 +304,7 @@ test('migrateConfig 已是 v5 时不做改动', () => {
   console.log(`\n${tests.length - failed}/${tests.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+
 
 
 
