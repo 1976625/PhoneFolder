@@ -8,7 +8,7 @@ const path = require('path');
 
 const { sortItems, isIgnoredName } = require('../../src/main/services/folder');
 const { findAvailableName, moveIntoFolder } = require('../../src/main/services/fsops');
-const { sanitizeSettings } = require('../../src/main/services/settings');
+const { sanitizeSettings, migrateConfig } = require('../../src/main/services/settings');
 
 const tests = [];
 function test(name, fn) {
@@ -145,6 +145,35 @@ test('sanitizeSettings 最多 6 个瓦片', () => {
   const tiles = Array.from({ length: 9 }, (_, index) => ({ folder: `D:\\tile-${index + 1}` }));
   const out = sanitizeSettings({ tiles, overlay: {}, app: {} }, { displayBounds: bounds, pathExists: () => true });
   assert.strictEqual(out.tiles.length, 6);
+});
+
+test('migrateConfig v2 的「绑定桌面」迁移成空瓦片', () => {
+  const raw = {
+    version: 2,
+    tiles: [
+      { folder: 'D:\\deskTop', x: 10, y: 20, size: 84 },
+      { folder: 'D:\\Custom\\Folder', x: 40, y: 50, size: 96 }
+    ],
+    overlay: {},
+    app: {}
+  };
+  const result = migrateConfig(raw, {
+    desktopPath: 'D:\\deskTop',
+    replacementFolder: 'D:\\deskTop\\手机文件夹'
+  });
+  assert.strictEqual(result.changed, true);
+  assert.strictEqual(result.rebound, true);
+  assert.strictEqual(result.config.version, 3);
+  assert.strictEqual(result.config.tiles[0].folder, 'D:\\deskTop\\手机文件夹');
+  assert.strictEqual(result.config.tiles[0].x, 10);
+  assert.strictEqual(result.config.tiles[1].folder, 'D:\\Custom\\Folder');
+});
+
+test('migrateConfig 已是 v3 时不做改动', () => {
+  const raw = { version: 3, tiles: [{ folder: 'D:\\deskTop' }] };
+  const result = migrateConfig(raw, { desktopPath: 'D:\\deskTop', replacementFolder: 'X' });
+  assert.strictEqual(result.changed, false);
+  assert.strictEqual(result.config, raw);
 });
 
 (async () => {

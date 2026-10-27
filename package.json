@@ -1,6 +1,6 @@
 {
   "name": "phone-folder",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "PhoneFolder - phone-style folder tiles for the Windows desktop",
   "main": "src/main/main.js",
   "author": "rabbit",
@@ -24,3 +24,4 @@
     ]
   }
 }
+

@@ -1,13 +1,16 @@
 'use strict';
 
-// config.json 读写 + 默认值 + 损坏备份 + 位置夹取
+// config.json 读写 + 默认值 + 损坏备份 + 位置夹取 + v2→v3 迁移
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { app, screen } = require('electron');
 const { log } = require('./logger');
+const { migrateConfig, CONFIG_VERSION } = require('./settings');
 
 const DEFAULT_TILE_SIZE = 84;
 const TILE_LABEL_HEIGHT = 20; // 图标下方标签占位
+const DEFAULT_FOLDER_NAME = '手机文件夹';
 
 function defaultTilePosition(size) {
   const b = screen.getPrimaryDisplay().bounds;
@@ -17,22 +20,34 @@ function defaultTilePosition(size) {
   };
 }
 
-function defaultFolder() {
-  const candidates = ['D:\\deskTop'];
-  for (const candidate of candidates) {
+// 默认绑定：桌面下的隐藏收纳文件夹（瓦片默认是空的，把桌面文件拖进去即可收纳）
+function ensureDefaultFolder() {
+  const desktop = app.getPath('desktop');
+  const folder = path.join(desktop, DEFAULT_FOLDER_NAME);
+  try {
+    fs.mkdirSync(folder, { recursive: true });
     try {
-      if (fs.statSync(candidate).isDirectory()) return candidate;
-    } catch { /* ignore */ }
+      execFileSync('attrib', ['+h', folder], { windowsHide: true, stdio: 'ignore' });
+    } catch { /* 隐藏属性设置失败不影响使用 */ }
+    return folder;
+  } catch (err) {
+    log('create default folder failed:', err.message);
+    try {
+      const fallback = path.join(app.getPath('userData'), DEFAULT_FOLDER_NAME);
+      fs.mkdirSync(fallback, { recursive: true });
+      return fallback;
+    } catch {
+      return desktop;
+    }
   }
-  return app.getPath('desktop');
 }
 
 function baseDefaults() {
   const pos = defaultTilePosition(DEFAULT_TILE_SIZE);
   return {
-    version: 2,
+    version: CONFIG_VERSION,
     tiles: [
-      { id: 't1', folder: defaultFolder(), x: pos.x, y: pos.y, size: DEFAULT_TILE_SIZE, opacity: 1 }
+      { id: 't1', folder: ensureDefaultFolder(), x: pos.x, y: pos.y, size: DEFAULT_TILE_SIZE, opacity: 1 }
     ],
     overlay: { columns: 3, rows: 3, dim: 0.42, blur: 26, theme: 'dark', background: 'wallpaper' },
     behavior: { openOnSingleClick: true },
@@ -83,6 +98,24 @@ function loadConfig() {
     raw = null;
   }
 
+  // v2 → v3：旧的「默认绑定桌面」迁移为「空瓦片 + 隐藏收纳文件夹」
+  const desktopPath = app.getPath('desktop');
+  let migrated = false;
+  let rebound = false;
+  if (raw && Number(raw.version || 0) < CONFIG_VERSION) {
+    const hasDesktopBinding = Array.isArray(raw.tiles)
+      && raw.tiles.some((tile) => tile && typeof tile.folder === 'string'
+        && path.resolve(tile.folder).toLowerCase() === path.resolve(desktopPath).toLowerCase());
+    const replacementFolder = hasDesktopBinding ? ensureDefaultFolder() : desktopPath;
+    const result = migrateConfig(raw, { desktopPath, replacementFolder });
+    if (result.changed) {
+      raw = result.config;
+      migrated = true;
+      rebound = result.rebound;
+      log('config migrated to v3, rebound tiles:', rebound, 'folder:', replacementFolder);
+    }
+  }
+
   const merged = {
     ...defaults,
     ...(raw || {}),
@@ -90,6 +123,7 @@ function loadConfig() {
     behavior: { ...defaults.behavior, ...((raw && raw.behavior) || {}) },
     app: { ...defaults.app, ...((raw && raw.app) || {}) }
   };
+  merged.version = CONFIG_VERSION;
 
   const displayBounds = screen.getPrimaryDisplay().bounds;
   if (!Array.isArray(merged.tiles) || merged.tiles.length === 0) {
@@ -108,7 +142,7 @@ function loadConfig() {
   merged.overlay.theme = 'dark';
 
   try {
-    if (!fs.existsSync(file)) writeAtomic(file, merged);
+    if (!fs.existsSync(file) || migrated) writeAtomic(file, merged);
   } catch (err) {
     log('config write failed:', err.message);
   }
@@ -123,4 +157,4 @@ function saveConfig(merged) {
   }
 }
 
-module.exports = { loadConfig, saveConfig, DEFAULT_TILE_SIZE, TILE_LABEL_HEIGHT };
+module.exports = { loadConfig, saveConfig, DEFAULT_TILE_SIZE, TILE_LABEL_HEIGHT, DEFAULT_FOLDER_NAME };

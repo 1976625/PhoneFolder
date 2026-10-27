@@ -123,3 +123,16 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
+/* 空瓦片：虚线提示可以往里拖 */
+.thumbs.empty {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(38, 40, 48, 0.42);
+}
+
+.tile.drag-over .thumbs.empty {
+  border-color: rgba(150, 220, 255, 0.9);
+  background: rgba(56, 64, 82, 0.72);
+}

@@ -5,11 +5,41 @@ const path = require('path');
 
 const BACKGROUND_MODES = ['wallpaper', 'capture', 'acrylic'];
 const MAX_TILES = 6;
+const CONFIG_VERSION = 3;
 
 function clamp(value, min, max, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(Math.max(number, min), max);
+}
+
+function isSamePath(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
+  try {
+    return path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+// v2 → v3：旧的「默认绑定桌面」迁移成「空瓦片」（绑定到隐藏收纳文件夹）
+function migrateConfig(raw, { desktopPath, replacementFolder }) {
+  if (!raw || typeof raw !== 'object') return { config: raw, changed: false, rebound: false };
+  const version = Number(raw.version) || 0;
+  if (version >= CONFIG_VERSION) return { config: raw, changed: false, rebound: false };
+
+  const config = JSON.parse(JSON.stringify(raw));
+  let rebound = false;
+  if (Array.isArray(config.tiles)) {
+    for (const tile of config.tiles) {
+      if (tile && isSamePath(tile.folder, desktopPath)) {
+        tile.folder = replacementFolder;
+        rebound = true;
+      }
+    }
+  }
+  config.version = CONFIG_VERSION;
+  return { config, changed: true, rebound };
 }
 
 function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTiles = MAX_TILES }) {
@@ -52,7 +82,7 @@ function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTi
   const appIn = input.app && typeof input.app === 'object' ? input.app : {};
 
   return {
-    version: 2,
+    version: CONFIG_VERSION,
     tiles,
     overlay: { columns: 3, rows: 3, dim, blur, theme: 'dark', background },
     behavior: { openOnSingleClick: true },
@@ -68,4 +98,5 @@ function settingsSnapshot(config) {
   };
 }
 
-module.exports = { sanitizeSettings, settingsSnapshot, BACKGROUND_MODES, MAX_TILES };
+module.exports = { sanitizeSettings, settingsSnapshot, migrateConfig, BACKGROUND_MODES, MAX_TILES, CONFIG_VERSION };
+
