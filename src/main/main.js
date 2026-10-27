@@ -14,6 +14,7 @@ const { OverlayWindow } = require('./windows/overlay-window');
 const { createBackdropWindow } = require('./windows/backdrop-window');
 const { createSettingsWindow } = require('./windows/settings-window');
 const { scanFolder, applyCustomOrder } = require('./services/folder');
+const { TILE_SIZE, gridMetrics, snapPosition, cellKey, cellOfPosition } = require('./services/grid');
 const { payloadForItem, prefetchShortcutIcons } = require('./services/icons');
 const { bottomWindow, topmostWindow, normalWindow, focusDesktop, watchDesktopState } = require('./services/native-window');
 const { moveIntoFolder } = require('./services/fsops');
@@ -329,6 +330,48 @@ function startTileWatcher() {
   }, 500);
 }
 
+function tileGridMetrics() {
+  return gridMetrics(screen.getPrimaryDisplay().workArea);
+}
+
+function occupiedGridCells(exceptTileId) {
+  const metrics = tileGridMetrics();
+  const occupied = new Set();
+  for (const tile of config.tiles) {
+    if (exceptTileId && tile.id === exceptTileId) continue;
+    occupied.add(cellOfPosition(tile.x, tile.y, metrics).key);
+  }
+  return occupied;
+}
+
+// 拖动松手后的小补间：让瓦片「啪」地滑进网格，而不是瞬移
+function animateWindowPosition(win, target, duration = 120) {
+  return new Promise((resolve) => {
+    if (!win || win.isDestroyed()) return resolve();
+    const [startX, startY] = win.getPosition();
+    const dx = target.x - startX;
+    const dy = target.y - startY;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+      win.setPosition(target.x, target.y);
+      return resolve();
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (!win || win.isDestroyed()) {
+        clearInterval(timer);
+        return resolve();
+      }
+      const t = Math.min(1, (Date.now() - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      win.setPosition(Math.round(startX + dx * eased), Math.round(startY + dy * eased));
+      if (t >= 1) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 16);
+  });
+}
+
 // 让瓦片始终待在普通窗口的 z-order 最底层（像桌面图标一样，不会盖住其它软件）
 function bottomAllTiles() {
   for (const win of tileWindows.values()) {
@@ -541,7 +584,7 @@ async function rebuildAll() {
 
 async function applySettings(input) {
   const next = sanitizeSettings(input, {
-    displayBounds: screen.getPrimaryDisplay().bounds,
+    displayBounds: screen.getPrimaryDisplay().workArea,
     pathExists: isDirectory
   });
   config = next;
@@ -788,12 +831,12 @@ function registerIpc() {
     const win = tileId ? tileWindows.get(tileId) : null;
     const drag = tileId ? dragStates.get(tileId) : null;
     if (!win || !drag) return;
-    const display = screen.getPrimaryDisplay().bounds;
+    const workArea = screen.getPrimaryDisplay().workArea;
     const bounds = win.getBounds();
     const nextX = drag.base[0] + Math.round(x - drag.cursor.x);
     const nextY = drag.base[1] + Math.round(y - drag.cursor.y);
-    const clampedX = Math.min(Math.max(nextX, display.x), display.x + display.width - bounds.width);
-    const clampedY = Math.min(Math.max(nextY, display.y), display.y + display.height - bounds.height);
+    const clampedX = Math.min(Math.max(nextX, workArea.x), workArea.x + workArea.width - bounds.width);
+    const clampedY = Math.min(Math.max(nextY, workArea.y), workArea.y + workArea.height - bounds.height);
     win.setPosition(clampedX, clampedY);
   });
   ipcMain.on('tile:drag-end', (event) => {
@@ -803,12 +846,36 @@ function registerIpc() {
     if (!win || !tile) return;
     dragStates.delete(tileId);
     const [x, y] = win.getPosition();
-    tile.x = x;
-    tile.y = y;
+    const metrics = tileGridMetrics();
+    const snapped = snapPosition(x, y, metrics, occupiedGridCells(tileId));
+    tile.x = snapped.x;
+    tile.y = snapped.y;
+    animateWindowPosition(win, snapped).then(() => {
+      saveConfig(config);
+      log('tile snapped', tileId, { x: snapped.x, y: snapped.y, col: snapped.col, row: snapped.row });
+      if (shouldTopmost()) topmostWindow(win);
+      else normalWindow(win);
+    }).catch(() => {});
+  });
+
+  // 设置页「重新对齐到网格」：把所有瓦片按当前分辨率/任务栏位置重新吸附
+  ipcMain.handle('tiles:realign', async (event) => {
+    if (!isSettingsSender(event)) return { ok: false };
+    const metrics = tileGridMetrics();
+    const occupied = new Set();
+    const jobs = [];
+    for (const tile of config.tiles) {
+      const snapped = snapPosition(tile.x, tile.y, metrics, occupied);
+      occupied.add(cellKey(snapped.col, snapped.row));
+      tile.x = snapped.x;
+      tile.y = snapped.y;
+      const win = tileWindows.get(tile.id);
+      if (win && !win.isDestroyed()) jobs.push(animateWindowPosition(win, snapped));
+    }
+    await Promise.all(jobs);
     saveConfig(config);
-    log('tile moved', tileId, { x, y });
-    if (shouldTopmost()) topmostWindow(win);
-    else normalWindow(win);
+    log('tiles realigned:', config.tiles.length);
+    return { ok: true, count: config.tiles.length };
   });
 
   /* ----------------------------- 设置 ----------------------------- */
@@ -1015,6 +1082,9 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+
+
+
 
 
 

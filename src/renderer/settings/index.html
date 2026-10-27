@@ -22,8 +22,11 @@
         <span class="hint" id="tile-hint">最多 6 个，同一文件夹只能绑一次</span>
       </div>
       <div id="tile-list" class="tile-list"></div>
-      <button id="add-tile" type="button" class="btn ghost">+ 添加瓦片</button>
-      <p class="hint">在浮层里按住条目拖动 = 手动排序（会保存）；拖出面板范围 = 拖出文件。</p>
+      <div class="tile-actions">
+        <button id="add-tile" type="button" class="btn ghost">+ 添加瓦片</button>
+        <button id="align-tiles" type="button" class="btn ghost">重新对齐到网格</button>
+      </div>
+      <p class="hint">瓦片尺寸固定 128px；拖动松手后自动吸附到网格。在浮层里按住条目拖动 = 手动排序（会保存）；拖出面板范围 = 拖出文件。</p>
     </section>
 
     <section class="section">
@@ -42,11 +45,7 @@
         <input id="blur" type="range" min="8" max="48" step="1">
         <b class="value" id="blur-val"></b>
       </label>
-      <label class="row">
-        <span>瓦片大小</span>
-        <input id="size" type="range" min="64" max="128" step="4">
-        <b class="value" id="size-val"></b>
-      </label>
+
     </section>
 
     <section class="section">
@@ -87,3 +86,4 @@
   <script src="renderer.js"></script>
 </body>
 </html>
+

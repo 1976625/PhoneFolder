@@ -331,3 +331,8 @@ body {
   transform: translate(-50%, 0);
 }
 
+
+.tile-actions {
+  display: flex;
+  gap: 8px;
+}

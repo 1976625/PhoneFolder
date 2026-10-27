@@ -7,17 +7,18 @@ const { execFileSync } = require('child_process');
 const { app, screen } = require('electron');
 const { log } = require('./logger');
 const { migrateConfig, CONFIG_VERSION, isSamePath, cleanTileName } = require('./settings');
+const { TILE_SIZE, LABEL_HEIGHT, gridMetrics, snapPosition, cellKey } = require('./grid');
 
-const DEFAULT_TILE_SIZE = 84;
-const TILE_LABEL_HEIGHT = 20; // 图标下方标签占位
+const DEFAULT_TILE_SIZE = TILE_SIZE; // 固定 128
+const TILE_LABEL_HEIGHT = LABEL_HEIGHT; // 图标下方标签占位
 const STORAGE_FOLDER_NAME = '手机文件夹';
 const LEGACY_FOLDER_NAME = '手机文件夹'; // v3 及更早的默认收纳文件夹名
 
-function defaultTilePosition(size) {
-  const b = screen.getPrimaryDisplay().bounds;
+function defaultTilePosition() {
+  const metrics = gridMetrics(screen.getPrimaryDisplay().workArea);
   return {
-    x: Math.round(b.x + b.width - size - 24),
-    y: Math.round(b.y + 24)
+    x: metrics.originX + (metrics.cols - 1) * metrics.cellW,
+    y: metrics.originY
   };
 }
 
@@ -107,11 +108,11 @@ function relocateFolderContents(oldFolder, newFolder) {
 }
 
 function baseDefaults() {
-  const pos = defaultTilePosition(DEFAULT_TILE_SIZE);
+  const pos = defaultTilePosition();
   return {
     version: CONFIG_VERSION,
     tiles: [
-      { id: 't1', folder: storageFolderPath(), x: pos.x, y: pos.y, size: DEFAULT_TILE_SIZE, opacity: 1 }
+      { id: 't1', folder: storageFolderPath(), x: pos.x, y: pos.y, size: TILE_SIZE, opacity: 1 }
     ],
     overlay: { columns: 3, rows: 3, dim: 0.42, blur: 26, theme: 'dark', background: 'wallpaper' },
     behavior: { openOnSingleClick: true },
@@ -130,8 +131,8 @@ function writeAtomic(file, data) {
 }
 
 function clampTile(tile, index, displayBounds) {
-  const size = Number(tile.size) || DEFAULT_TILE_SIZE;
-  const fallback = defaultTilePosition(size);
+  const size = TILE_SIZE;
+  const fallback = defaultTilePosition();
   let x = Number.isFinite(tile.x) ? tile.x : fallback.x;
   let y = Number.isFinite(tile.y) ? tile.y : fallback.y;
   x = Math.min(Math.max(x, displayBounds.x), displayBounds.x + displayBounds.width - size);
@@ -141,7 +142,7 @@ function clampTile(tile, index, displayBounds) {
     id: typeof tile.id === 'string' && tile.id ? tile.id : `t${index + 1}`,
     x: Math.round(x),
     y: Math.round(y),
-    size: Math.round(size)
+    size: TILE_SIZE
   };
   const name = cleanTileName(cleaned.name);
   if (name) cleaned.name = name;
@@ -229,11 +230,22 @@ function loadConfig() {
   };
   merged.version = CONFIG_VERSION;
 
-  const displayBounds = screen.getPrimaryDisplay().bounds;
+  const workArea = screen.getPrimaryDisplay().workArea;
   if (!Array.isArray(merged.tiles) || merged.tiles.length === 0) {
     merged.tiles = defaults.tiles;
   }
-  merged.tiles = merged.tiles.slice(0, 6).map((tile, index) => clampTile(tile, index, displayBounds));
+  const metrics = gridMetrics(workArea);
+  const occupied = new Set();
+  let snappedChanged = false;
+  merged.tiles = merged.tiles
+    .slice(0, 6)
+    .map((tile, index) => clampTile(tile, index, workArea))
+    .map((tile) => {
+      const snapped = snapPosition(tile.x, tile.y, metrics, occupied);
+      occupied.add(cellKey(snapped.col, snapped.row));
+      if (snapped.x !== tile.x || snapped.y !== tile.y) snappedChanged = true;
+      return { ...tile, x: snapped.x, y: snapped.y };
+    });
 
   // overlay 数值夹取：手改 config 也不至于把界面弄坏
   merged.overlay.dim = Math.min(Math.max(Number(merged.overlay.dim) || 0.42, 0.15), 0.7);
@@ -248,7 +260,7 @@ function loadConfig() {
   if (!hadConfig) ensureStorageFolder();
 
   try {
-    if (!hadConfig || migrated) writeAtomic(file, merged);
+    if (!hadConfig || migrated || snappedChanged) writeAtomic(file, merged);
   } catch (err) {
     log('config write failed:', err.message);
   }
@@ -271,6 +283,7 @@ module.exports = {
   STORAGE_FOLDER_NAME,
   storageFolderPath
 };
+
 
 
 

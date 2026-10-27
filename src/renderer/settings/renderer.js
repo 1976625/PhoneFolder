@@ -147,9 +147,7 @@ function render() {
   $('dim-val').textContent = `${dimValue}%`;
   $('blur').value = String(draft.overlay.blur);
   $('blur-val').textContent = `${draft.overlay.blur}px`;
-  const size = draft.tiles[0] ? draft.tiles[0].size : 84;
-  $('size').value = String(size);
-  $('size-val').textContent = `${size}px`;
+
   $('background').value = draft.overlay.background;
 
   // 系统
@@ -183,11 +181,7 @@ function wireInputs() {
     draft.overlay.blur = value;
     $('blur-val').textContent = `${value}px`;
   });
-  $('size').addEventListener('input', () => {
-    const value = Number($('size').value);
-    draft.tiles.forEach((tile) => { tile.size = value; });
-    $('size-val').textContent = `${value}px`;
-  });
+
   $('autostart').addEventListener('change', () => {
     draft.app.launchAtLogin = $('autostart').checked;
   });
@@ -207,16 +201,20 @@ function wireInputs() {
       showError('这个文件夹已经绑定过瓦片了');
       return;
     }
-    const last = draft.tiles[draft.tiles.length - 1];
-    const size = last ? last.size : 84;
     const width = window.screen.availWidth || 1920;
     draft.tiles.push({
       folder,
-      x: Math.max(0, width - size - 24 - draft.tiles.length * 40),
+      x: Math.max(0, width - 128 - 24 - draft.tiles.length * 40),
       y: 24 + draft.tiles.length * 40,
-      size
+      size: 128
     });
     render();
+  });
+
+  $('align-tiles').addEventListener('click', async () => {
+    const result = await window.phoneFolder.realignTiles();
+    if (result && result.ok) showToast(`已重新对齐 ${result.count} 个瓦片`);
+    else showError('重新对齐失败');
   });
 
   $('save').addEventListener('click', async () => {
@@ -260,3 +258,4 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (data) loadSnapshot(data);
   }
 });
+

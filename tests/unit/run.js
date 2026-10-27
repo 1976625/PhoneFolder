@@ -9,6 +9,7 @@ const path = require('path');
 const { sortItems, isIgnoredName, applyCustomOrder } = require('../../src/main/services/folder');
 const { findAvailableName, moveIntoFolder } = require('../../src/main/services/fsops');
 const { sanitizeSettings, migrateConfig, cleanTileName } = require('../../src/main/services/settings');
+const grid = require('../../src/main/services/grid');
 
 const tests = [];
 function test(name, fn) {
@@ -117,7 +118,7 @@ test('sanitizeSettings 去重/夹取/默认值', () => {
   assert.strictEqual(out.tiles[0].size, 128);
   assert.ok(out.tiles[0].x <= 1920 - 128);
   assert.ok(out.tiles[0].y >= 0);
-  assert.strictEqual(out.tiles[1].size, 64);
+  assert.strictEqual(out.tiles[1].size, 128);
   assert.strictEqual(out.overlay.dim, 0.7);
   assert.strictEqual(out.overlay.blur, 8);
   assert.strictEqual(out.overlay.background, 'wallpaper');
@@ -162,6 +163,31 @@ test('sanitizeSettings 保留自定义瓦片名', () => {
     app: { launchAtLogin: false }
   }, { displayBounds: { x: 0, y: 0, width: 1920, height: 1080 }, pathExists: () => true });
   assert.strictEqual(out.tiles[0].name, '我的 收纳');
+});
+
+test('gridMetrics 按 workArea 算出网格（任务栏在左 48px）', () => {
+  const metrics = grid.gridMetrics({ x: 48, y: 0, width: 1872, height: 1080 });
+  assert.strictEqual(metrics.originX, 56);
+  assert.strictEqual(metrics.originY, 8);
+  assert.strictEqual(metrics.cellW, 144);
+  assert.strictEqual(metrics.cellH, 164);
+  assert.strictEqual(metrics.cols, 13);
+  assert.strictEqual(metrics.rows, 6);
+});
+
+test('nearestCell 把任意坐标吸附到最近网格', () => {
+  const metrics = grid.gridMetrics({ x: 48, y: 0, width: 1872, height: 1080 });
+  const cell = grid.nearestCell(1792, 18, metrics);
+  assert.deepStrictEqual(cell, { col: 12, row: 0, x: 1784, y: 8 });
+  const clamped = grid.nearestCell(-100, -100, metrics);
+  assert.deepStrictEqual(clamped, { col: 0, row: 0, x: 56, y: 8 });
+});
+
+test('snapPosition 在格子被占用时找最近的空格', () => {
+  const metrics = grid.gridMetrics({ x: 48, y: 0, width: 1872, height: 1080 });
+  const occupied = new Set(['12:0']);
+  const snapped = grid.snapPosition(1792, 18, metrics, occupied);
+  assert.deepStrictEqual(snapped, { col: 11, row: 0, x: 1640, y: 8 });
 });
 
 test('applyCustomOrder 按自定义顺序排列，未知项保持默认顺序追加', () => {
@@ -211,7 +237,7 @@ test('migrateConfig v2 的「绑定桌面」迁移到独立收纳目录', () => 
     replacementFolder: 'D:\\手机文件夹'
   });
   assert.strictEqual(result.changed, true);
-  assert.strictEqual(result.config.version, 4);
+  assert.strictEqual(result.config.version, 5);
   assert.deepStrictEqual(result.relocated, ['D:\\deskTop']);
   assert.strictEqual(result.config.tiles[0].folder, 'D:\\手机文件夹');
   assert.strictEqual(result.config.tiles[0].x, 10);
@@ -237,8 +263,26 @@ test('migrateConfig v3 的隐藏桌面收纳文件夹迁移到独立目录', () 
   assert.strictEqual(result.config.tiles[1].folder, 'D:\\deskTop\\项目demo');
 });
 
-test('migrateConfig 已是 v4 时不做改动', () => {
-  const raw = { version: 4, tiles: [{ folder: 'D:\\手机文件夹' }] };
+test('migrateConfig v4→v5 只做尺寸归一', () => {
+  const raw = {
+    version: 4,
+    tiles: [
+      { folder: 'D:\\瓦片盒子\\手机文件夹', x: 1792, y: 18, size: 96 },
+      { folder: 'D:\\瓦片盒子\\手机文件夹2', x: 1600, y: 220, size: 84 }
+    ]
+  };
+  const result = migrateConfig(raw, { desktopPath: 'D:\\deskTop', replacementFolder: 'D:\\手机文件夹' });
+  assert.strictEqual(result.changed, true);
+  assert.deepStrictEqual(result.relocated, []);
+  assert.strictEqual(result.config.version, 5);
+  assert.strictEqual(result.config.tiles[0].size, 128);
+  assert.strictEqual(result.config.tiles[1].size, 128);
+  assert.strictEqual(result.config.tiles[0].folder, 'D:\\瓦片盒子\\手机文件夹');
+  assert.strictEqual(result.config.tiles[0].x, 1792);
+});
+
+test('migrateConfig 已是 v5 时不做改动', () => {
+  const raw = { version: 5, tiles: [{ folder: 'D:\\手机文件夹', size: 128 }] };
   const result = migrateConfig(raw, { desktopPath: 'D:\\deskTop', replacementFolder: 'X' });
   assert.strictEqual(result.changed, false);
   assert.strictEqual(result.config, raw);
@@ -259,6 +303,8 @@ test('migrateConfig 已是 v4 时不做改动', () => {
   console.log(`\n${tests.length - failed}/${tests.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+
+
 
 
 

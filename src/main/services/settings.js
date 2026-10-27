@@ -2,10 +2,11 @@
 
 // 设置校验 + 配置迁移（v2/v3 → v4：收纳文件夹从桌面迁到桌面同级的独立目录）
 const path = require('path');
+const { TILE_SIZE } = require('./grid');
 
 const BACKGROUND_MODES = ['wallpaper', 'capture', 'acrylic'];
 const MAX_TILES = 6;
-const CONFIG_VERSION = 4;
+const CONFIG_VERSION = 5;
 
 function clamp(value, min, max, fallback) {
   const number = Number(value);
@@ -42,17 +43,24 @@ function migrateConfig(raw, { desktopPath, replacementFolder, shouldRelocate } =
   }
 
   const config = JSON.parse(JSON.stringify(raw));
-  const decide = typeof shouldRelocate === 'function'
-    ? shouldRelocate
-    : (folder) => isSamePath(folder, desktopPath);
-
   const relocated = [];
+  // v2/v3 的桌面收纳目录迁移只在 <4 时执行；v4→v5 只做尺寸归一
+  if (version < 4) {
+    const decide = typeof shouldRelocate === 'function'
+      ? shouldRelocate
+      : (folder) => isSamePath(folder, desktopPath);
+    if (Array.isArray(config.tiles)) {
+      for (const tile of config.tiles) {
+        if (tile && typeof tile.folder === 'string' && decide(tile.folder)) {
+          relocated.push(tile.folder);
+          tile.folder = replacementFolder;
+        }
+      }
+    }
+  }
   if (Array.isArray(config.tiles)) {
     for (const tile of config.tiles) {
-      if (tile && typeof tile.folder === 'string' && decide(tile.folder)) {
-        relocated.push(tile.folder);
-        tile.folder = replacementFolder;
-      }
+      if (tile) tile.size = TILE_SIZE;
     }
   }
   config.version = CONFIG_VERSION;
@@ -79,7 +87,7 @@ function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTi
     if (!pathExists(folder)) throw new Error(`文件夹不存在：${folder}`);
     seen.add(key);
 
-    const size = Math.round(clamp(raw.size, 64, 128, 84));
+    const size = TILE_SIZE; // 固定 128，不再可调
     const maxX = bounds.x + bounds.width - size;
     const maxY = bounds.y + bounds.height - size - 20;
     const rawX = Number(raw.x);
@@ -149,6 +157,7 @@ module.exports = {
   isSamePath,
   cleanTileName
 };
+
 
 
 

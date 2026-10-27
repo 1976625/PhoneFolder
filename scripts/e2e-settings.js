@@ -67,7 +67,7 @@ const TWO_TILE_INPUT = {
 };
 
 const SINGLE_TILE_INPUT = {
-  tiles: ORIGINAL.tiles.map((tile) => ({ folder: tile.folder, x: tile.x, y: tile.y, size: tile.size })),
+  tiles: ORIGINAL.tiles.map((tile) => ({ folder: tile.folder, x: tile.x, y: tile.y, size: tile.size, name: tile.name, order: tile.order })),
   overlay: ORIGINAL.overlay,
   app: { launchAtLogin: Boolean(ORIGINAL.app && ORIGINAL.app.launchAtLogin) }
 };
@@ -139,4 +139,5 @@ function inspectState() {
   console.error(err && err.stack ? err.stack : String(err));
   process.exit(1);
 });
+
 
