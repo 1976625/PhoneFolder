@@ -233,8 +233,92 @@ function applyIcon(iconWrap, glyph, payload) {
   glyph.remove();
 }
 
-function itemEl(item, index) {
-  const btn = document.createElement('button');
+/* ---------------------------- 拖拽：面板内排序 / 拖出 ---------------------------- */
+const SORT_THRESHOLD = 6;
+const DRAG_OUT_MARGIN = 28;
+const SORT_OUT_MARGIN = 60;
+
+let sortDrag = null; // { btn, item, pointerId }
+let itemPress = null; // 当前按下的条目（window 级 pointer 监听使用）
+
+function isOutsidePanel(clientX, clientY, margin) {
+  const rect = panelEl.getBoundingClientRect();
+  return clientX < rect.left - margin
+    || clientX > rect.right + margin
+    || clientY < rect.top - margin
+    || clientY > rect.bottom + margin;
+}
+
+function currentPageNames() {
+  return [...gridEl.querySelectorAll('.item')].map((el) => el.dataset.name).filter(Boolean);
+}
+
+function collectFullOrder() {
+  const order = items.map((entry) => entry.name);
+  const pageNames = currentPageNames();
+  const start = page * pageSize;
+  pageNames.forEach((name, index) => {
+    if (start + index < order.length) order[start + index] = name;
+  });
+  return order;
+}
+
+function cancelSorting(restore) {
+  if (!sortDrag) return;
+  const { btn } = sortDrag;
+  sortDrag = null;
+  itemPress = null;
+  btn.classList.remove('sorting');
+  gridEl.classList.remove('sorting-active');
+  if (restore) renderPage();
+}
+
+function finishSorting(commit) {
+  if (!sortDrag) return;
+  const order = collectFullOrder();
+  cancelSorting(false);
+  if (!commit) {
+    renderPage();
+    return;
+  }
+  const byName = new Map(items.map((entry) => [entry.name, entry]));
+  const next = order.map((name) => byName.get(name)).filter(Boolean);
+  if (next.length === items.length) items = next;
+  window.phoneFolder.reorderItems(order).catch(() => { /* ignore */ });
+}
+
+function startNativeDragOut(btn, item, pointerId) {
+  try { if (pointerId != null) btn.releasePointerCapture(pointerId); } catch { /* ignore */ }
+  btn.classList.add('dragging-out');
+  const cached = iconCache.get(item.path);
+  window.phoneFolder.dragOut({
+    path: item.path,
+    iconDataUrl: cached ? cached.dataUrl : null
+  });
+}
+
+function updateSorting(clientX, clientY) {
+  if (!sortDrag) return;
+  // 拖出面板较大范围：放弃排序，转为原生拖出
+  if (isOutsidePanel(clientX, clientY, SORT_OUT_MARGIN)) {
+    const { btn, item, pointerId } = sortDrag;
+    sortDrag = null;
+    itemPress = null;
+    btn.classList.remove('sorting');
+    gridEl.classList.remove('sorting-active');
+    renderPage();
+    startNativeDragOut(btn, item, pointerId);
+    return;
+  }
+  const target = document.elementFromPoint(clientX, clientY);
+  const targetItem = target && target.closest ? target.closest('.item') : null;
+  if (!targetItem || targetItem === sortDrag.btn) return;
+  const rect = targetItem.getBoundingClientRect();
+  const insertBefore = clientY < rect.top + rect.height / 2;
+  sortDrag.btn.parentNode.insertBefore(sortDrag.btn, insertBefore ? targetItem : targetItem.nextSibling);
+}
+
+function itemEl(item, index) {  const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'item';
   btn.style.animationDelay = `${index * 18}ms`;
@@ -252,7 +336,10 @@ function itemEl(item, index) {
   name.className = 'name';
   name.textContent = displayItemName(item.name);
 
+  btn.dataset.name = item.name;
   btn.append(icon, name);
+  let suppressClick = false;
+  let press = null;
   btn.addEventListener('click', (event) => {
     event.stopPropagation();
     if (suppressClick) return;
@@ -268,32 +355,25 @@ function itemEl(item, index) {
     event.stopPropagation();
     window.phoneFolder.showItemMenu(item.path);
   });
-  // 拖出：按下后移动超过阈值就调用 Electron 原生 startDrag（一次一个文件）。
-  // 注意：<button> 上的 HTML5 dragstart 不可靠，所以不用 draggable，直接走 pointer 事件。
-  let dragPointer = null;
-  let suppressClick = false;
+  // 面板内部拖动 = 排序；拖出面板范围 = 原生拖出（一次一个文件）。
+  // 没有用 HTML5 dragstart：<button> 上它不可靠；pointermove/up 统一挂在 window 上，
+  // 这样拖动过程中 DOM 重排（insertBefore）不会丢事件。
   btn.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
-    dragPointer = { x: event.screenX, y: event.screenY, started: false };
+    itemPress = {
+      btn,
+      item,
+      pointerId: event.pointerId,
+      startX: event.screenX,
+      startY: event.screenY,
+      started: false,
+      sorting: false,
+      suppress: (ms) => {
+        suppressClick = true;
+        setTimeout(() => { suppressClick = false; }, ms || 320);
+      }
+    };
   });
-  btn.addEventListener('pointermove', (event) => {
-    if (!dragPointer || dragPointer.started) return;
-    const moved = Math.abs(event.screenX - dragPointer.x) + Math.abs(event.screenY - dragPointer.y);
-    if (moved < 6) return;
-    dragPointer.started = true;
-    suppressClick = true;
-    setTimeout(() => { suppressClick = false; }, 1500);
-    btn.classList.add('dragging-out');
-    const cached = iconCache.get(item.path);
-    window.phoneFolder.dragOut({
-      path: item.path,
-      iconDataUrl: cached ? cached.dataUrl : null
-    });
-  });
-  const endPointerDrag = () => { dragPointer = null; };
-  btn.addEventListener('pointerup', endPointerDrag);
-  btn.addEventListener('pointercancel', endPointerDrag);
-  btn.addEventListener('pointerleave', () => { if (dragPointer && !dragPointer.started) dragPointer = null; });
 
   loadIcon(item, icon, glyph);
   return btn;
@@ -317,6 +397,46 @@ function renderMessage(kind) {
   box.append(text, hint);
   gridEl.appendChild(box);
 }
+
+window.addEventListener('pointermove', (event) => {
+  if (!itemPress) return;
+  const press = itemPress;
+  if (!press.started) {
+    const moved = Math.abs(event.screenX - press.startX) + Math.abs(event.screenY - press.startY);
+    if (moved < SORT_THRESHOLD) return;
+    press.started = true;
+    if (isOutsidePanel(event.clientX, event.clientY, DRAG_OUT_MARGIN)) {
+      itemPress = null;
+      press.suppress(1500);
+      startNativeDragOut(press.btn, press.item, event.pointerId);
+      return;
+    }
+    press.sorting = true;
+    sortDrag = { btn: press.btn, item: press.item, pointerId: event.pointerId };
+    press.btn.classList.add('sorting');
+    gridEl.classList.add('sorting-active');
+    updateSorting(event.clientX, event.clientY);
+    return;
+  }
+  if (press.sorting) updateSorting(event.clientX, event.clientY);
+}, true);
+
+function endItemPress() {
+  if (!itemPress) return;
+  const press = itemPress;
+  itemPress = null;
+  if (!press.sorting) return;
+  press.suppress(320);
+  finishSorting(true);
+}
+
+window.addEventListener('pointerup', endItemPress, true);
+window.addEventListener('pointercancel', () => {
+  if (!itemPress) return;
+  const press = itemPress;
+  itemPress = null;
+  if (press.sorting) finishSorting(false);
+});
 
 function renderPage() {
   gridEl.textContent = '';
@@ -444,13 +564,17 @@ function openOverlay(data) {
 
 function onRefresh(data) {
   if (!isOpen || isClosing) return;
+  cancelSorting(false);
+  const prevPage = page;
   applyPayload(data);
+  if (pagesCount() > 0) page = Math.min(prevPage, pagesCount() - 1);
   renderPage();
 }
 
 function closeOverlay() {
   if (!isOpen || isClosing) return;
   cancelTitleEdit();
+  cancelSorting(false);
   isClosing = true;
   panelEl.classList.remove('items-in');
   panelEl.style.transition = `transform ${CLOSE_MS}ms cubic-bezier(0.4, 0, 1, 1), opacity 200ms ease-in`;
@@ -573,6 +697,10 @@ document.addEventListener('drop', async (event) => {
   const summary = await window.phoneFolder.dropFiles(paths);
   showToast(summary);
 });
+
+
+
+
 
 
 

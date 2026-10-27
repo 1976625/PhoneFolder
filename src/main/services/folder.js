@@ -37,7 +37,26 @@ function chineseMessage(code) {
   }
 }
 
-async function scanFolder(folder) {
+// 自定义排序：按 order 里的文件名顺序排列；order 里没有的项保持原来的默认排序排在后面
+function applyCustomOrder(items, order) {
+  if (!Array.isArray(order) || order.length === 0) return items;
+  const rank = new Map();
+  for (let i = 0; i < order.length; i += 1) {
+    const name = order[i];
+    if (typeof name === 'string' && name && !rank.has(name)) rank.set(name, i);
+  }
+  if (rank.size === 0) return items;
+  const known = [];
+  const unknown = [];
+  for (const item of items) {
+    if (rank.has(item.name)) known.push(item);
+    else unknown.push(item);
+  }
+  known.sort((a, b) => rank.get(a.name) - rank.get(b.name));
+  return [...known, ...unknown];
+}
+
+async function scanFolder(folder, { order } = {}) {
   const result = {
     folder,
     name: path.basename(folder) || folder,
@@ -80,8 +99,9 @@ async function scanFolder(folder) {
   }));
 
   items.sort(sortItems);
-  result.items = items;
+  result.items = applyCustomOrder(items, order);
   return result;
 }
 
-module.exports = { scanFolder, sortItems, isIgnoredName, chineseMessage, SCAN_LIMIT };
+module.exports = { scanFolder, sortItems, applyCustomOrder, isIgnoredName, chineseMessage, SCAN_LIMIT };
+

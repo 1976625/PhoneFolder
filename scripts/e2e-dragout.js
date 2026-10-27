@@ -10,7 +10,7 @@ const EXE = process.env.PF_APP_EXE || path.join(APP, 'node_modules', 'electron',
 const CONFIG = path.join(process.env.APPDATA || '', 'phone-folder', 'config.json');
 const DESKTOP = 'D:\\deskTop';
 const PORT = 9224;
-const TEST_NAME = '_pf_dragout_test.lnk';
+const TEST_NAME = '_pf_dragout_test.txt';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function waitFor(fn, { timeout = 25000, interval = 250 } = {}) {
@@ -59,7 +59,7 @@ function evaluate(target, expression) {
   for (const file of [source, dropped]) {
     try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch { /* ignore */ }
   }
-  fs.copyFileSync(path.join(DESKTOP, 'Steam.lnk'), source);
+  fs.writeFileSync(source, 'phone-folder drag out test\n', 'utf8');
 
   const child = spawn(EXE, ['.', '--remote-debugging-port=' + PORT], {
     cwd: APP,
@@ -79,15 +79,22 @@ function evaluate(target, expression) {
     await waitFor(async () => (await evaluate(overlayTarget, 'document.getElementById("panel").style.opacity')) === '1');
     await delay(1200);
 
-    const info = await evaluate(overlayTarget, `(() => {
-      const items = [...document.querySelectorAll('.item')];
-      const btn = items.find((el) => (el.querySelector('.name')?.textContent || '') === '_pf_dragout_test');
-      if (!btn) return null;
-      const r = btn.getBoundingClientRect();
-      const offX = window.screenX + (window.outerWidth - window.innerWidth) / 2;
-      const offY = window.screenY + (window.outerHeight - window.innerHeight) / 2;
-      return { x: Math.round(offX + r.x + r.width / 2), y: Math.round(offY + r.y + r.height / 2), count: items.length };
-    })()`);
+    let info = null;
+    for (let pageTry = 0; pageTry < 10 && !info; pageTry += 1) {
+      info = await evaluate(overlayTarget, `(() => {
+        const items = [...document.querySelectorAll('.item')];
+        const btn = items.find((el) => el.dataset.name === '_pf_dragout_test.txt');
+        if (!btn) return null;
+        const r = btn.getBoundingClientRect();
+        const offX = window.screenX + (window.outerWidth - window.innerWidth) / 2;
+        const offY = window.screenY + (window.outerHeight - window.innerHeight) / 2;
+        return { x: Math.round(offX + r.x + r.width / 2), y: Math.round(offY + r.y + r.height / 2), count: items.length };
+      })()`);
+      if (!info) {
+        await evaluate(overlayTarget, 'window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }))');
+        await delay(500);
+      }
+    }
     console.log('item screen position:', JSON.stringify(info));
     if (!info) throw new Error('浮层里没找到测试文件');
 
@@ -120,3 +127,6 @@ function evaluate(target, expression) {
   console.error(err && err.stack ? err.stack : String(err));
   process.exit(1);
 });
+
+
+

@@ -70,8 +70,12 @@ function editTitle(overlayTarget, value) {
   const storage = readConfig().tiles[0].folder;
   const configBackup = fs.readFileSync(CONFIG, 'utf8');
   const testLnk = path.join(storage, '_pf_suffix_test.lnk');
-  if (!fs.existsSync(path.join('D:\\deskTop', 'Steam.lnk'))) throw new Error('缺少 Steam.lnk 测试样本');
-  fs.copyFileSync(path.join('D:\\deskTop', 'Steam.lnk'), testLnk);
+  // 用 PowerShell 现场创建一个测试快捷方式（不依赖桌面上现有 .lnk）
+  execFileSync('powershell.exe', [
+    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command',
+    `$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('${testLnk}'); $s.TargetPath = 'C:\\Windows\\System32\\notepad.exe'; $s.Save()`
+  ], { windowsHide: true });
+  if (!fs.existsSync(testLnk)) throw new Error('测试快捷方式创建失败');
 
   const child = spawn(EXE, ['.', '--remote-debugging-port=' + PORT], {
     cwd: APP,
@@ -111,7 +115,13 @@ function editTitle(overlayTarget, value) {
     if (tileLabel !== '我的收纳盒') throw new Error('瓦片标签没有同步: ' + tileLabel);
 
     // 3) 面板条目名不显示 .lnk 后缀
-    const names = await evaluate(overlayTarget, `[...document.querySelectorAll('.item .name')].map((el) => el.textContent)`);
+    let names = [];
+    for (let pageTry = 0; pageTry < 10; pageTry += 1) {
+      names = await evaluate(overlayTarget, `[...document.querySelectorAll('.item .name')].map((el) => el.textContent)`);
+      if (names.some((name) => String(name).includes('_pf_suffix_test'))) break;
+      await evaluate(overlayTarget, 'window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }))');
+      await delay(450);
+    }
     console.log('item names:', JSON.stringify(names));
     const suffixItem = names.find((name) => String(name).includes('_pf_suffix_test'));
     if (!suffixItem) throw new Error('测试快捷方式没有出现在面板里');
@@ -141,4 +151,6 @@ function editTitle(overlayTarget, value) {
   console.error(err && err.stack ? err.stack : String(err));
   process.exit(1);
 });
+
+
 

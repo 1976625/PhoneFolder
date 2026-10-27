@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   openItem: (itemPath) => ipcRenderer.send('item:open', itemPath),
   showItemMenu: (itemPath) => ipcRenderer.send('item:menu', itemPath),
   dropFiles: (paths) => ipcRenderer.invoke('files:drop-in', paths),
+  reorderItems: (orderedNames) => ipcRenderer.invoke('items:reorder', orderedNames),
   dragOut: (payload) => ipcRenderer.send('item:drag-out', payload),
 
   // 截图用假桌面
@@ -44,4 +45,5 @@ contextBridge.exposeInMainWorld('phoneFolder', {
   getPathForFile: (file) => webUtils.getPathForFile(file),
   log: (...args) => ipcRenderer.send('log', args.map(String).join(' '))
 });
+
 

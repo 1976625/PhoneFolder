@@ -328,3 +328,20 @@ body.drop-active .drop-hint {
   opacity: 0.55;
   cursor: grabbing;
 }
+
+/* 面板内部拖动排序 */
+.item.sorting {
+  opacity: 0.92;
+  z-index: 2;
+  cursor: grabbing;
+  transition: transform 120ms ease;
+}
+
+.item.sorting .icon {
+  transform: scale(1.08);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+}
+
+.grid.sorting-active .item:not(.sorting) {
+  transition: transform 140ms ease;
+}

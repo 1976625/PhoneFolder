@@ -13,7 +13,7 @@ const { createTileWindow, LABEL_HEIGHT } = require('./windows/tile-window');
 const { OverlayWindow } = require('./windows/overlay-window');
 const { createBackdropWindow } = require('./windows/backdrop-window');
 const { createSettingsWindow } = require('./windows/settings-window');
-const { scanFolder } = require('./services/folder');
+const { scanFolder, applyCustomOrder } = require('./services/folder');
 const { payloadForItem, prefetchShortcutIcons } = require('./services/icons');
 const { bottomWindow, topmostWindow, normalWindow, focusDesktop, watchDesktopState } = require('./services/native-window');
 const { moveIntoFolder } = require('./services/fsops');
@@ -96,7 +96,8 @@ function stateOf(tileId) {
 async function loadFolderState(tileId) {
   const folder = tileFolder(tileId);
   if (!folder) return null;
-  const data = await scanFolder(folder);
+  const tile = tileById(tileId);
+  const data = await scanFolder(folder, { order: tile ? tile.order : undefined });
   const state = folderStates.get(tileId) || {};
   state.data = data;
   folderStates.set(tileId, state);
@@ -541,7 +542,7 @@ async function removeTile(tileId) {
   const rest = config.tiles.filter((tile) => tile.id !== tileId);
   if (rest.length === 0) return;
   await applySettings({
-    tiles: rest.map((tile) => ({ folder: tile.folder, x: tile.x, y: tile.y, size: tile.size, name: tile.name })),
+    tiles: rest.map((tile) => ({ folder: tile.folder, x: tile.x, y: tile.y, size: tile.size, name: tile.name, order: tile.order })),
     overlay: config.overlay,
     app: config.app
   });
@@ -617,6 +618,39 @@ function registerIpc() {
     menu.popup({ window: overlay && overlay.win ? overlay.win : null });
   });
 
+  // 面板内部拖动排序：保存该瓦片的自定义顺序（只记录当前存在的文件名）
+  ipcMain.handle('items:reorder', (event, orderedNames) => {
+    if (!overlay || !overlay.win || event.sender !== overlay.win.webContents) return { ok: false };
+    const tile = overlayTileId ? tileById(overlayTileId) : null;
+    if (!tile) return { ok: false, error: '找不到瓦片' };
+    const data = stateOf(tile.id);
+    const items = (data && data.items) || [];
+    const existing = new Set(items.map((item) => item.name));
+    const names = [];
+    const seen = new Set();
+    if (Array.isArray(orderedNames)) {
+      for (const name of orderedNames) {
+        if (typeof name !== 'string' || !existing.has(name) || seen.has(name)) continue;
+        seen.add(name);
+        names.push(name);
+      }
+    }
+    if (names.length === 0) return { ok: false, error: '顺序为空' };
+    for (const item of items) {
+      if (!seen.has(item.name)) names.push(item.name);
+    }
+    tile.order = names;
+    saveConfig(config);
+    if (data) data.items = applyCustomOrder(items, names);
+    const win = tileWindows.get(tile.id);
+    if (win && !win.isDestroyed()) win.webContents.send('tile:refresh', buildTilePayload(tile));
+    if (overlay && overlay.isOpen && overlayTileId === tile.id && overlay.win) {
+      overlay.win.webContents.send('overlay:refresh', buildOverlayPayload(tile));
+    }
+    log('items reordered:', tile.id, names.length);
+    return { ok: true, order: names };
+  });
+
   // 拖入：资源管理器 → 瓦片/浮层，移入该瓦片绑定的文件夹
   ipcMain.handle('files:drop-in', async (event, paths) => {
     const folder = senderFolder(event);
@@ -636,6 +670,19 @@ function registerIpc() {
     }
     log('drop-in done:', { moved: summary.moved, skipped: summary.skipped, failed: summary.failed });
     const tileId = senderTileId(event) || overlayTileId;
+    const tile = tileId ? tileById(tileId) : null;
+    if (tile && Array.isArray(tile.order) && tile.order.length > 0) {
+      let changed = false;
+      for (const result of summary.results) {
+        if (result.status !== 'moved') continue;
+        const name = path.basename(result.movedTo || '');
+        if (name && !tile.order.includes(name)) {
+          tile.order.push(name);
+          changed = true;
+        }
+      }
+      if (changed) saveConfig(config);
+    }
     if (tileId) await refreshTile(tileId);
     return summary;
   });
@@ -942,6 +989,8 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+
+
 
 
 

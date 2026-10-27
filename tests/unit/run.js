@@ -6,7 +6,7 @@ const fsp = require('fs/promises');
 const os = require('os');
 const path = require('path');
 
-const { sortItems, isIgnoredName } = require('../../src/main/services/folder');
+const { sortItems, isIgnoredName, applyCustomOrder } = require('../../src/main/services/folder');
 const { findAvailableName, moveIntoFolder } = require('../../src/main/services/fsops');
 const { sanitizeSettings, migrateConfig, cleanTileName } = require('../../src/main/services/settings');
 
@@ -164,6 +164,22 @@ test('sanitizeSettings 保留自定义瓦片名', () => {
   assert.strictEqual(out.tiles[0].name, '我的 收纳');
 });
 
+test('applyCustomOrder 按自定义顺序排列，未知项保持默认顺序追加', () => {
+  const items = [{ name: 'a' }, { name: 'b' }, { name: 'c' }];
+  assert.deepStrictEqual(applyCustomOrder(items, ['c', 'a']).map((item) => item.name), ['c', 'a', 'b']);
+  assert.deepStrictEqual(applyCustomOrder(items, []).map((item) => item.name), ['a', 'b', 'c']);
+  assert.deepStrictEqual(applyCustomOrder(items, ['b']).map((item) => item.name), ['b', 'a', 'c']);
+});
+
+test('sanitizeSettings 保留自定义排序 order', () => {
+  const out = sanitizeSettings({
+    tiles: [{ folder: 'D:\\wf', order: ['b', 'a', 'b', '', 3], x: 10, y: 20, size: 84 }],
+    overlay: { dim: 0.4, blur: 20, background: 'wallpaper' },
+    app: { launchAtLogin: false }
+  }, { displayBounds: { x: 0, y: 0, width: 1920, height: 1080 }, pathExists: () => true });
+  assert.deepStrictEqual(out.tiles[0].order, ['b', 'a']);
+});
+
 test('migrateConfig v2 的「绑定桌面」迁移到独立收纳目录', () => {
   const raw = {
     version: 2,
@@ -227,4 +243,5 @@ test('migrateConfig 已是 v4 时不做改动', () => {
   console.log(`\n${tests.length - failed}/${tests.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+
 

@@ -146,6 +146,12 @@ function clampTile(tile, index, displayBounds) {
   const name = cleanTileName(cleaned.name);
   if (name) cleaned.name = name;
   else delete cleaned.name;
+  if (Array.isArray(cleaned.order)) {
+    cleaned.order = cleaned.order.filter((entry) => typeof entry === 'string' && entry).slice(0, 500);
+    if (cleaned.order.length === 0) delete cleaned.order;
+  } else {
+    delete cleaned.order;
+  }
   return cleaned;
 }
 
@@ -265,4 +271,5 @@ module.exports = {
   STORAGE_FOLDER_NAME,
   storageFolderPath
 };
+
 

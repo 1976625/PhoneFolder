@@ -88,7 +88,26 @@ function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTi
     const y = Math.round(clamp(Number.isFinite(rawY) ? rawY : bounds.y + 24, bounds.y, maxY, bounds.y + 24));
 
     const name = cleanTileName(raw.name);
-    tiles.push({ id: `t${tiles.length + 1}`, folder, x, y, size, opacity: 1, ...(name ? { name } : {}) });
+    const order = [];
+    if (Array.isArray(raw.order)) {
+      const seenOrder = new Set();
+      for (const entry of raw.order) {
+        if (typeof entry !== 'string' || !entry || seenOrder.has(entry)) continue;
+        seenOrder.add(entry);
+        order.push(entry);
+        if (order.length >= 500) break;
+      }
+    }
+    tiles.push({
+      id: `t${tiles.length + 1}`,
+      folder,
+      x,
+      y,
+      size,
+      opacity: 1,
+      ...(name ? { name } : {}),
+      ...(order.length ? { order } : {})
+    });
   }
 
   if (tiles.length === 0) throw new Error('至少保留一个瓦片');
@@ -126,4 +145,6 @@ module.exports = {
   isSamePath,
   cleanTileName
 };
+
+
 
