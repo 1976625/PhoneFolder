@@ -34,10 +34,21 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 | `release/PhoneFolder-0.11.0-portable.exe` | 93.6 MB | **双击即用**（自解压到临时目录运行） |
 | `release/PhoneFolder-0.11.0-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
 
-- SHA-256 前 16 位：portable `AB03128430701DEC` · zip `DCC53282677E7951`
+- SHA-256 前 16 位：portable `361EF4B387C95344` · zip `FA1C7EF3928EA6D9`
 - 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
 - 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
 - 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
+
+> **本机注意**：项目 `release/` 目录继承了当前会话的沙箱 ACL，直接在里面运行 EXE 会启动失败（没反应）。
+> 发布产物已复制到普通目录 **`D:\PhoneFolder\`**，请从那里双击运行：
+> `D:\PhoneFolder\PhoneFolder-0.11.0-portable.exe`。
+> 以后换新版也建议复制到该目录（或桌面等普通文件夹）再运行，不要直接在项目 `release/` 里点。
+
+### 双击没反应时
+
+1. 可能已经有一个实例在后台（托盘图标里）——双击只会激活旧实例；右键托盘 → 退出，再启动；
+2. 查看日志 `%APPDATA%\phone-folder\logs\app.log` 是否有 `second instance detected` / `startup: tile ready`；
+3. 确认 EXE 位于普通文件夹（不要放在项目的 `release/` 目录里）。
 
 ## 默认行为：空瓦片 + 收纳
 
@@ -182,6 +193,7 @@ D:\deskTop\phoneS\
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件（拖到桌面会删掉源文件，拖到其它位置是复制）
 - 瓦片层级用前台窗口启发式判断（显示桌面状态保持可见、其它时候压到软件下面）；彻底方案见 P6「真占格」
 - 多显示器未适配；网格按主屏 workArea 计算，换分辨率/任务栏位置可在设置里「重新对齐到网格」
+
 
 
 
