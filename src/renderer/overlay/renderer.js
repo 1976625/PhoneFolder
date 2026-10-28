@@ -238,9 +238,14 @@ const SORT_THRESHOLD = 6;
 const DRAG_OUT_MARGIN = 28;
 const SORT_OUT_MARGIN = 60;
 const SORT_SETTLE_MS = 200;
+const EDGE_ZONE = 56; // 拖到左右边缘多少像素内触发翻页
+const EDGE_DWELL_MS = 420; // 在边缘停留多久翻页
 
 let sortDrag = null; // 排序拖动状态
 let itemPress = null; // 当前按下的条目（window 级 pointer 监听使用）
+let ghostDrag = null; // 跨页拖动：条目跟着鼠标，当前页可切换
+let edgeFlip = null; // 边缘翻页等待计时器 { side, x, y, timer }
+let pendingPageAfterDrop = null; // 跨页松手后，等待主进程刷新时把页面锁定在目标页
 
 function isOutsidePanel(clientX, clientY, margin) {
   const rect = panelEl.getBoundingClientRect();
@@ -274,6 +279,7 @@ function clearSortStyles() {
 
 function cancelSorting(restore) {
   if (!sortDrag) return;
+  clearEdgeFlip();
   const { btn } = sortDrag;
   sortDrag = null;
   itemPress = null;
@@ -392,12 +398,14 @@ function updateSorting(clientX, clientY) {
   if (!sortDrag) return;
   // 拖出面板较大范围：放弃排序，转为原生拖出
   if (isOutsidePanel(clientX, clientY, SORT_OUT_MARGIN)) {
+    clearEdgeFlip();
     const { btn, item, pointerId } = sortDrag;
     cancelSorting(false);
     renderPage();
     startNativeDragOut(btn, item, pointerId);
     return;
   }
+  scheduleEdgeFlip(edgeTargetSide(clientX, clientY), clientX, clientY);
   const target = nearestSlotIndex(clientX, clientY);
   if (target !== sortDrag.index) reorderTo(target);
   moveSortGhost(clientX, clientY);
@@ -405,6 +413,7 @@ function updateSorting(clientX, clientY) {
 
 function finishSorting(commit) {
   if (!sortDrag) return;
+  clearEdgeFlip();
   const state = sortDrag;
   const order = collectFullOrder();
   sortDrag = null;
@@ -439,8 +448,135 @@ function finishSorting(commit) {
   window.phoneFolder.reorderItems(order).catch(() => { /* ignore */ });
 }
 
-function itemEl(item, index) {  const btn = document.createElement('button');
+/* ---------------------------- 拖到边缘翻页 ---------------------------- */
+function clearEdgeFlip() {
+  if (edgeFlip && edgeFlip.timer) clearTimeout(edgeFlip.timer);
+  edgeFlip = null;
+}
+
+function edgeTargetSide(x, y) {
+  const rect = panelEl.getBoundingClientRect();
+  if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return 0;
+  const leftDist = x - rect.left;
+  const rightDist = rect.right - x;
+  if (rightDist <= EDGE_ZONE && page + 1 < pagesCount()) return 1;
+  if (leftDist <= EDGE_ZONE && page > 0) return -1;
+  return 0;
+}
+
+function scheduleEdgeFlip(side, x, y) {
+  if (!side) {
+    clearEdgeFlip();
+    return;
+  }
+  if (edgeFlip && edgeFlip.side === side) {
+    edgeFlip.x = x;
+    edgeFlip.y = y;
+    return;
+  }
+  clearEdgeFlip();
+  edgeFlip = {
+    side,
+    x,
+    y,
+    timer: setTimeout(() => {
+      if (!edgeFlip) return;
+      const nextSide = edgeFlip.side;
+      const nextX = edgeFlip.x;
+      const nextY = edgeFlip.y;
+      edgeFlip = null;
+      flipPageForDrag(nextSide, nextX, nextY);
+    }, EDGE_DWELL_MS)
+  };
+}
+
+function moveGhost(x, y) {
+  if (!ghostDrag) return;
+  ghostDrag.lastX = x;
+  ghostDrag.lastY = y;
+  ghostDrag.el.style.left = `${Math.round(x - 56)}px`;
+  ghostDrag.el.style.top = `${Math.round(y - 62)}px`;
+}
+
+// 拖动中翻页：原条目变成跟随鼠标的 ghost，页面切到上/下一页，松手时插入到目标页
+function flipPageForDrag(side, x, y) {
+  const target = page + side;
+  if (target < 0 || target >= pagesCount()) return;
+  if (sortDrag) {
+    const btn = sortDrag.btn;
+    const item = sortDrag.item;
+    const ghost = btn.cloneNode(true);
+    ghost.classList.remove('sorting');
+    ghost.classList.add('ghost-item');
+    ghost.removeAttribute('style');
+    ghost.style.animation = 'none';
+    ghost.style.opacity = '1';
+    ghostDrag = { el: ghost, name: item.name, fromPage: page, lastX: x, lastY: y };
+    cancelSorting(false);
+    page = target;
+    renderPage();
+    document.body.appendChild(ghost);
+    moveGhost(x, y);
+  } else if (ghostDrag) {
+    page = target;
+    renderPage();
+    moveGhost(x, y);
+  }
+}
+
+function cancelGhostDrag() {
+  if (!ghostDrag) return;
+  clearEdgeFlip();
+  const state = ghostDrag;
+  ghostDrag = null;
+  state.el.remove();
+  renderPage();
+}
+
+function finalizeGhostDrop() {
+  if (!ghostDrag) return;
+  clearEdgeFlip();
+  const state = ghostDrag;
+  ghostDrag = null;
+  state.el.remove();
+
+  const pageEls = [...gridEl.querySelectorAll('.item')];
+  const targetPage = page;
+  let pos = 0;
+  if (pageEls.length > 0) {
+    let best = 0;
+    let bestDist = Infinity;
+    pageEls.forEach((el, index) => {
+      const r = el.getBoundingClientRect();
+      const dx = state.lastX - (r.left + r.width / 2);
+      const dy = state.lastY - (r.top + r.height / 2);
+      const dist = dx * dx + dy * dy;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = index;
+      }
+    });
+    pos = best;
+  }
+
+  const names = items.map((entry) => entry.name);
+  const oldIndex = names.indexOf(state.name);
+  if (oldIndex >= 0) names.splice(oldIndex, 1);
+  const insertAt = Math.min(Math.max(0, targetPage * pageSize + pos), names.length);
+  names.splice(insertAt, 0, state.name);
+
+  const byName = new Map(items.map((entry) => [entry.name, entry]));
+  const next = names.map((name) => byName.get(name)).filter(Boolean);
+  if (next.length === items.length) items = next;
+  window.phoneFolder.reorderItems(names).catch(() => { /* ignore */ });
+  renderPage();
+  pendingPageAfterDrop = targetPage;
+}
+
+function itemEl(item, index) {
+  const btn = document.createElement('button');
   btn.type = 'button';
+
   btn.className = 'item';
   btn.style.animationDelay = `${index * 18}ms`;
 
@@ -520,6 +656,15 @@ function renderMessage(kind) {
 }
 
 window.addEventListener('pointermove', (event) => {
+  if (ghostDrag) {
+    if (isOutsidePanel(event.clientX, event.clientY, 70)) {
+      cancelGhostDrag();
+      return;
+    }
+    moveGhost(event.clientX, event.clientY);
+    scheduleEdgeFlip(edgeTargetSide(event.clientX, event.clientY), event.clientX, event.clientY);
+    return;
+  }
   if (!itemPress) return;
   const press = itemPress;
   if (!press.started) {
@@ -541,6 +686,10 @@ window.addEventListener('pointermove', (event) => {
 }, true);
 
 function endItemPress() {
+  if (ghostDrag) {
+    finalizeGhostDrop();
+    return;
+  }
   if (!itemPress) return;
   const press = itemPress;
   itemPress = null;
@@ -551,6 +700,10 @@ function endItemPress() {
 
 window.addEventListener('pointerup', endItemPress, true);
 window.addEventListener('pointercancel', () => {
+  if (ghostDrag) {
+    cancelGhostDrag();
+    return;
+  }
   if (!itemPress) return;
   const press = itemPress;
   itemPress = null;
@@ -636,6 +789,7 @@ function openOverlay(data) {
   }
   isOpen = true;
   isClosing = false;
+  pendingPageAfterDrop = null;
   openedAt = data.openedAt || Date.now();
   tileRect = data.tileRect || {
     x: Math.round(window.innerWidth / 2) - 42,
@@ -683,15 +837,27 @@ function openOverlay(data) {
 
 function onRefresh(data) {
   if (!isOpen || isClosing) return;
+  if (ghostDrag) cancelGhostDrag();
   cancelSorting(false);
   const prevPage = page;
   applyPayload(data);
-  if (pagesCount() > 0) page = Math.min(prevPage, pagesCount() - 1);
+  if (pendingPageAfterDrop !== null) {
+    // 跨页拖动刚刚落位：主进程刷新可能晚于本地渲染，这里强制停在目标页
+    page = Math.min(pendingPageAfterDrop, pagesCount() - 1);
+    pendingPageAfterDrop = null;
+  } else if (pagesCount() > 0) {
+    page = Math.min(prevPage, pagesCount() - 1);
+  }
   renderPage();
 }
 
 function closeOverlay() {
   if (!isOpen || isClosing) return;
+  if (ghostDrag) {
+    ghostDrag.el.remove();
+    ghostDrag = null;
+  }
+  clearEdgeFlip();
   cancelTitleEdit();
   cancelSorting(false);
   isClosing = true;
@@ -816,6 +982,13 @@ document.addEventListener('drop', async (event) => {
   const summary = await window.phoneFolder.dropFiles(paths);
   showToast(summary);
 });
+
+
+
+
+
+
+
 
 
 

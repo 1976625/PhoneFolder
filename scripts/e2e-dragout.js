@@ -99,8 +99,8 @@ function evaluate(target, expression) {
     if (!info) throw new Error('浮层里没找到测试文件');
 
     // 目标：桌面空白处
-    const targetX = 400;
-    const targetY = 760;
+    const targetX = 700;
+    const targetY = 200;
     execFileSync('powershell.exe', [
       '-NoProfile', '-ExecutionPolicy', 'Bypass',
       '-File', path.join(__dirname, 'mouse-drag.ps1'),
@@ -127,6 +127,7 @@ function evaluate(target, expression) {
   console.error(err && err.stack ? err.stack : String(err));
   process.exit(1);
 });
+
 
 
 

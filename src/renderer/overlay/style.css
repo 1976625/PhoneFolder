@@ -354,3 +354,19 @@ body.drop-active .drop-hint {
   box-shadow: none;
 }
 
+
+/* 跨页拖动时的跟随 ghost（不属于网格，避免被页面切换清掉） */
+.ghost-item {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 112px;
+  margin: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 1 !important;
+  animation: none !important;
+  transform: scale(1.05) !important;
+  transform-origin: center top;
+  filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.45));
+}
