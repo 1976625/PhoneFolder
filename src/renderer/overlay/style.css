@@ -329,19 +329,28 @@ body.drop-active .drop-hint {
   cursor: grabbing;
 }
 
-/* 面板内部拖动排序 */
+/* 面板内部拖动排序：拖着的条目悬浮跟随鼠标，其它条目平滑让位 */
 .item.sorting {
-  opacity: 0.92;
-  z-index: 2;
+  z-index: 10;
   cursor: grabbing;
-  transition: transform 120ms ease;
+  transition: none !important;
+  will-change: transform;
 }
 
 .item.sorting .icon {
-  transform: scale(1.08);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+  transform: scale(1.06);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 140ms ease;
 }
 
 .grid.sorting-active .item:not(.sorting) {
-  transition: transform 140ms ease;
+  will-change: transform;
 }
+
+/* 排序时禁用 hover/active 的缩放，避免和 FLIP 动画打架 */
+.grid.sorting-active .item:hover .icon,
+.grid.sorting-active .item:active .icon {
+  transform: none;
+  box-shadow: none;
+}
+

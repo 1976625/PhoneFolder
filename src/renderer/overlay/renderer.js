@@ -237,8 +237,9 @@ function applyIcon(iconWrap, glyph, payload) {
 const SORT_THRESHOLD = 6;
 const DRAG_OUT_MARGIN = 28;
 const SORT_OUT_MARGIN = 60;
+const SORT_SETTLE_MS = 200;
 
-let sortDrag = null; // { btn, item, pointerId }
+let sortDrag = null; // 排序拖动状态
 let itemPress = null; // 当前按下的条目（window 级 pointer 监听使用）
 
 function isOutsidePanel(clientX, clientY, margin) {
@@ -263,28 +264,118 @@ function collectFullOrder() {
   return order;
 }
 
+function clearSortStyles() {
+  for (const el of gridEl.querySelectorAll('.item')) {
+    el.style.transition = '';
+    el.style.transform = '';
+  }
+  gridEl.classList.remove('sorting-active');
+}
+
 function cancelSorting(restore) {
   if (!sortDrag) return;
   const { btn } = sortDrag;
   sortDrag = null;
   itemPress = null;
   btn.classList.remove('sorting');
-  gridEl.classList.remove('sorting-active');
+  btn.style.transition = '';
+  btn.style.transform = '';
+  clearSortStyles();
   if (restore) renderPage();
 }
 
-function finishSorting(commit) {
-  if (!sortDrag) return;
-  const order = collectFullOrder();
-  cancelSorting(false);
-  if (!commit) {
-    renderPage();
-    return;
+// 按下后开始排序：缓存每个格子的位置，记录抓取点在条目内的偏移
+function beginSorting(btn, item, pointerId, pointerX, pointerY) {
+  const elements = [...gridEl.querySelectorAll('.item')];
+  if (elements.length === 0) return;
+  const rects = new Map();
+  for (const el of elements) rects.set(el, el.getBoundingClientRect());
+  const rect = rects.get(btn);
+  sortDrag = {
+    btn,
+    item,
+    pointerId,
+    elements,
+    slots: elements.map((el) => {
+      const r = rects.get(el);
+      return { x: r.left, y: r.top, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    }),
+    index: elements.indexOf(btn),
+    offsetX: pointerX - rect.left,
+    offsetY: pointerY - rect.top
+  };
+  // 入场动画的 forwards 结束态会盖住 inline transform，而且基础 .item 是 opacity:0；
+  // 排序期间用 inline 样式停掉动画并锁定不透明度（清理时保留，避免动画重播闪一下）。
+  for (const el of elements) {
+    el.style.animation = 'none';
+    el.style.opacity = '1';
   }
-  const byName = new Map(items.map((entry) => [entry.name, entry]));
-  const next = order.map((name) => byName.get(name)).filter(Boolean);
-  if (next.length === items.length) items = next;
-  window.phoneFolder.reorderItems(order).catch(() => { /* ignore */ });
+  btn.classList.add('sorting');
+  btn.style.transition = 'none';
+  gridEl.classList.add('sorting-active');
+  moveSortGhost(pointerX, pointerY);
+}
+
+// 被拖动的条目跟随鼠标（相对于它在网格里的格子做 translate）
+function moveSortGhost(x, y) {
+  if (!sortDrag) return;
+  const slot = sortDrag.slots[sortDrag.index];
+  if (!slot) return;
+  const dx = x - sortDrag.offsetX - slot.x;
+  const dy = y - sortDrag.offsetY - slot.y;
+  sortDrag.btn.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1.05)`;
+}
+
+// 用几何距离找最近的格子——不依赖 elementFromPoint，避免被拖拽中的条目自己挡住
+function nearestSlotIndex(x, y) {
+  if (!sortDrag) return 0;
+  let best = 0;
+  let bestDist = Infinity;
+  sortDrag.slots.forEach((slot, index) => {
+    const dx = x - slot.cx;
+    const dy = y - slot.cy;
+    const dist = dx * dx + dy * dy;
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = index;
+    }
+  });
+  return best;
+}
+
+// FLIP：重排 DOM 后让其它条目从旧位置平滑滑到新位置
+function reorderTo(targetIndex) {
+  const state = sortDrag;
+  if (!state) return;
+  const { btn, elements } = state;
+  const before = new Map();
+  for (const el of elements) before.set(el, el.getBoundingClientRect());
+
+  elements.splice(elements.indexOf(btn), 1);
+  elements.splice(targetIndex, 0, btn);
+  state.index = targetIndex;
+  for (const el of elements) gridEl.appendChild(el);
+
+  const after = new Map();
+  for (const el of elements) after.set(el, el.getBoundingClientRect());
+  for (const el of elements) {
+    if (el === btn) continue;
+    const b = before.get(el);
+    const a = after.get(el);
+    const dx = b.left - a.left;
+    const dy = b.top - a.top;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+    el.style.transition = 'none';
+    el.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`;
+  }
+  void gridEl.offsetWidth;
+  requestAnimationFrame(() => {
+    for (const el of elements) {
+      if (el === btn) continue;
+      el.style.transition = 'transform 170ms cubic-bezier(0.22, 1, 0.36, 1)';
+      el.style.transform = 'translate(0px, 0px)';
+    }
+  });
 }
 
 function startNativeDragOut(btn, item, pointerId) {
@@ -302,20 +393,50 @@ function updateSorting(clientX, clientY) {
   // 拖出面板较大范围：放弃排序，转为原生拖出
   if (isOutsidePanel(clientX, clientY, SORT_OUT_MARGIN)) {
     const { btn, item, pointerId } = sortDrag;
-    sortDrag = null;
-    itemPress = null;
-    btn.classList.remove('sorting');
-    gridEl.classList.remove('sorting-active');
+    cancelSorting(false);
     renderPage();
     startNativeDragOut(btn, item, pointerId);
     return;
   }
-  const target = document.elementFromPoint(clientX, clientY);
-  const targetItem = target && target.closest ? target.closest('.item') : null;
-  if (!targetItem || targetItem === sortDrag.btn) return;
-  const rect = targetItem.getBoundingClientRect();
-  const insertBefore = clientY < rect.top + rect.height / 2;
-  sortDrag.btn.parentNode.insertBefore(sortDrag.btn, insertBefore ? targetItem : targetItem.nextSibling);
+  const target = nearestSlotIndex(clientX, clientY);
+  if (target !== sortDrag.index) reorderTo(target);
+  moveSortGhost(clientX, clientY);
+}
+
+function finishSorting(commit) {
+  if (!sortDrag) return;
+  const state = sortDrag;
+  const order = collectFullOrder();
+  sortDrag = null;
+  itemPress = null;
+  state.btn.classList.remove('sorting');
+  gridEl.classList.remove('sorting-active');
+
+  if (!commit) {
+    clearSortStyles();
+    renderPage();
+    return;
+  }
+
+  // 让拖着的条目从当前悬浮位置平滑回落到它的格子里
+  void state.btn.offsetWidth;
+  state.btn.style.transition = `transform ${SORT_SETTLE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+  state.btn.style.transform = 'translate(0px, 0px) scale(1)';
+  setTimeout(() => {
+    state.btn.style.transition = '';
+    state.btn.style.transform = '';
+    for (const el of state.elements) {
+      if (el !== state.btn) {
+        el.style.transition = '';
+        el.style.transform = '';
+      }
+    }
+  }, SORT_SETTLE_MS + 40);
+
+  const byName = new Map(items.map((entry) => [entry.name, entry]));
+  const next = order.map((name) => byName.get(name)).filter(Boolean);
+  if (next.length === items.length) items = next;
+  window.phoneFolder.reorderItems(order).catch(() => { /* ignore */ });
 }
 
 function itemEl(item, index) {  const btn = document.createElement('button');
@@ -412,9 +533,7 @@ window.addEventListener('pointermove', (event) => {
       return;
     }
     press.sorting = true;
-    sortDrag = { btn: press.btn, item: press.item, pointerId: event.pointerId };
-    press.btn.classList.add('sorting');
-    gridEl.classList.add('sorting-active');
+    beginSorting(press.btn, press.item, event.pointerId, event.clientX, event.clientY);
     updateSorting(event.clientX, event.clientY);
     return;
   }
@@ -697,6 +816,7 @@ document.addEventListener('drop', async (event) => {
   const summary = await window.phoneFolder.dropFiles(paths);
   showToast(summary);
 });
+
 
 
 
