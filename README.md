@@ -33,8 +33,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 | 产物 | 大小 | 用法 |
 |---|---|---|
-| `release/PhoneFolder-0.12.1-portable.exe` | 93.6 MB | **双击即用**（自解压到临时目录运行） |
-| `release/PhoneFolder-0.12.1-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
+| `release/PhoneFolder-0.12.1-setup.exe` | ~94 MB | 安装版：双击安装（当前用户，无需管理员），自动创建桌面/开始菜单快捷方式 |\n| `release/PhoneFolder-0.12.1-portable.exe` | 93.6 MB | **双击即用**（自解压到临时目录运行） |\n| `release/PhoneFolder-0.12.1-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
 
 - SHA-256 前 16 位：portable `5BDEBB4EAE7E7183` · zip `95DB9C2858CFB6B3`
 - 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
@@ -198,4 +197,5 @@ D:\deskTop\phoneS\
 - 默认收纳目录在桌面同级；若你手动把它改成桌面里的文件夹，它会正常显示在桌面上（这是你的显式选择）
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件（拖到桌面会删掉源文件，拖到其它位置是复制）
 - 网格按主屏 workArea 计算，换分辨率/任务栏位置可在设置里「重新对齐到网格」；瓦片上限 24 个
+
 
