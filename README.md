@@ -33,9 +33,11 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 | 产物 | 大小 | 用法 |
 |---|---|---|
-| `release/PhoneFolder-0.12.1-setup.exe` | ~94 MB | 安装版：双击安装（当前用户，无需管理员），自动创建桌面/开始菜单快捷方式 |\n| `release/PhoneFolder-0.12.1-portable.exe` | 93.6 MB | **双击即用**（自解压到临时目录运行） |\n| `release/PhoneFolder-0.12.1-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
+| `release/PhoneFolder-0.12.1-setup.exe` | 102.8 MB | 安装版：双击安装（当前用户，无需管理员），自动创建桌面/开始菜单快捷方式 |
+| `release/PhoneFolder-0.12.1-portable.exe` | 93.6 MB | **双击即用**（自解压到临时目录运行） |
+| `release/PhoneFolder-0.12.1-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
 
-- SHA-256 前 16 位：portable `5BDEBB4EAE7E7183` · zip `95DB9C2858CFB6B3`
+- SHA-256 前 16 位：setup `C37FF5CC7493A9C0` · portable `5BDEBB4EAE7E7183` · zip `95DB9C2858CFB6B3`
 - 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
 - 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
 - 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
