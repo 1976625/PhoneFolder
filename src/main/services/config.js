@@ -6,7 +6,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { app, screen } = require('electron');
 const { log } = require('./logger');
-const { migrateConfig, CONFIG_VERSION, isSamePath, cleanTileName } = require('./settings');
+const { migrateConfig, CONFIG_VERSION, isSamePath, cleanTileName, MAX_TILES } = require('./settings');
 const { TILE_SIZE, LABEL_HEIGHT, gridMetrics, snapPosition, cellKey } = require('./grid');
 
 const DEFAULT_TILE_SIZE = TILE_SIZE; // 固定 128
@@ -238,7 +238,7 @@ function loadConfig() {
   const occupied = new Set();
   let snappedChanged = false;
   merged.tiles = merged.tiles
-    .slice(0, 6)
+    .slice(0, MAX_TILES)
     .map((tile, index) => clampTile(tile, index, workArea))
     .map((tile) => {
       const snapped = snapPosition(tile.x, tile.y, metrics, occupied);
@@ -283,6 +283,7 @@ module.exports = {
   STORAGE_FOLDER_NAME,
   storageFolderPath
 };
+
 
 
 

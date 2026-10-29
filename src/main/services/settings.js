@@ -5,7 +5,7 @@ const path = require('path');
 const { TILE_SIZE } = require('./grid');
 
 const BACKGROUND_MODES = ['wallpaper', 'capture', 'acrylic'];
-const MAX_TILES = 6;
+const MAX_TILES = 24;
 const CONFIG_VERSION = 5;
 
 function clamp(value, min, max, fallback) {
@@ -158,6 +158,7 @@ module.exports = {
   isSamePath,
   cleanTileName
 };
+
 
 
 

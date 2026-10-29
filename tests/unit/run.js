@@ -8,7 +8,7 @@ const path = require('path');
 
 const { sortItems, isIgnoredName, applyCustomOrder } = require('../../src/main/services/folder');
 const { findAvailableName, moveIntoFolder } = require('../../src/main/services/fsops');
-const { sanitizeSettings, migrateConfig, cleanTileName } = require('../../src/main/services/settings');
+const { sanitizeSettings, migrateConfig, cleanTileName, MAX_TILES } = require('../../src/main/services/settings');
 const grid = require('../../src/main/services/grid');
 
 const tests = [];
@@ -157,11 +157,11 @@ test('sanitizeSettings 校验文件夹绝对路径/存在/至少一个', () => {
   );
 });
 
-test('sanitizeSettings 最多 6 个瓦片', () => {
+test('sanitizeSettings 按 MAX_TILES 截断瓦片', () => {
   const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
-  const tiles = Array.from({ length: 9 }, (_, index) => ({ folder: `D:\\tile-${index + 1}` }));
+  const tiles = Array.from({ length: MAX_TILES + 3 }, (_, index) => ({ folder: `D:\\tile-${index + 1}` }));
   const out = sanitizeSettings({ tiles, overlay: {}, app: {} }, { displayBounds: bounds, pathExists: () => true });
-  assert.strictEqual(out.tiles.length, 6);
+  assert.strictEqual(out.tiles.length, MAX_TILES);
 });
 
 test('cleanTileName 去空白/换行并按 24 字截断', () => {
@@ -320,6 +320,7 @@ test('migrateConfig 已是 v5 时不做改动', () => {
   console.log(`\n${tests.length - failed}/${tests.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+
 
 
 
