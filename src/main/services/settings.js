@@ -134,7 +134,8 @@ function sanitizeSettings(input, { displayBounds, pathExists = () => true, maxTi
     app: {
       launchAtLogin: Boolean(appIn.launchAtLogin),
       firstRunDone: true,
-      keepVisibleOnShowDesktop: appIn.keepVisibleOnShowDesktop !== false
+      keepVisibleOnShowDesktop: appIn.keepVisibleOnShowDesktop !== false,
+      tileMode: appIn.tileMode === 'desktop' ? 'desktop' : 'window'
     }
   };
 }

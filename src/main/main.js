@@ -16,7 +16,7 @@ const { createSettingsWindow } = require('./windows/settings-window');
 const { scanFolder, applyCustomOrder } = require('./services/folder');
 const { TILE_SIZE, gridMetrics, snapPosition, cellKey, cellOfPosition } = require('./services/grid');
 const { payloadForItem, prefetchShortcutIcons } = require('./services/icons');
-const { bottomWindow, topmostWindow, normalWindow, focusDesktop, watchDesktopState } = require('./services/native-window');
+const { bottomWindow, topmostWindow, normalWindow, focusDesktop, watchDesktopState, hwndOf, attachWindow, detachWindow, moveWindow, showWindow, hideWindow, windowHealth } = require('./services/native-window');
 const { moveIntoFolder } = require('./services/fsops');
 const { sanitizeSettings, settingsSnapshot, cleanTileName } = require('./services/settings');
 const {
@@ -59,6 +59,10 @@ let tilesVisible = true;
 let quitting = false;
 let rebuilding = false;
 let precreateTimer = null;
+const desktopAttached = new Set(); // tileId 已挂到桌面层
+const desktopRects = new Map(); // tileId -> DIP 屏幕矩形 { x, y, width, height }
+const desktopAttachWarned = new Set();
+let desktopWatchTimer = null;
 
 /* ------------------------------------------------------------------ */
 /* 背景                                                                 */
@@ -147,7 +151,8 @@ function buildTilePayload(tile) {
 function buildOverlayPayload(tile) {
   const data = stateOf(tile.id);
   const displayBounds = screen.getPrimaryDisplay().bounds;
-  const bounds = tileWindows.get(tile.id) ? tileWindows.get(tile.id).getBounds() : { x: 0, y: 0, width: tile.size, height: tile.size + LABEL_HEIGHT };
+  const win = tileWindows.get(tile.id);
+  const bounds = tileWindowDipRect(tile, win);
   return {
     tileId: tile.id,
     openedAt: Date.now(),
@@ -287,6 +292,7 @@ function shouldTopmost() {
 // showDesktop=false：有软件窗口 → 取消置顶并压回最底层，保证瓦片永远在软件下面
 function applyDesktopState(showDesktop) {
   if (quitting) return;
+  if (desktopTileMode()) return; // 桌面级子窗口模式：Win+D 不会被收起，无需临时置顶
   lastShowDesktop = showDesktop;
   if (!tilesVisible) return;
   const top = shouldTopmost();
@@ -334,6 +340,138 @@ function tileGridMetrics() {
   return gridMetrics(screen.getPrimaryDisplay().workArea);
 }
 
+/* ---------------------- 桌面级子窗口（实验） ---------------------- */
+function desktopTileMode() {
+  return !isStage && Boolean(config && config.app && config.app.tileMode === 'desktop');
+}
+
+function dipToPhysicalRect(rect) {
+  try {
+    return screen.dipToScreenRect(rect) || rect;
+  } catch {
+    return rect;
+  }
+}
+
+function tileWindowDipRect(tile, win) {
+  if (desktopTileMode() && desktopAttached.has(tile.id) && desktopRects.has(tile.id)) {
+    return desktopRects.get(tile.id);
+  }
+  if (win && !win.isDestroyed()) {
+    const bounds = win.getBounds();
+    return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+  }
+  return { x: tile.x, y: tile.y, width: tile.size, height: tile.size + LABEL_HEIGHT };
+}
+
+async function attachTileWindow(win, tile, { force = false } = {}) {
+  if (!desktopTileMode() || !win || win.isDestroyed()) return false;
+  if (desktopAttached.has(tile.id) && !force) return true;
+  const dip = { x: tile.x, y: tile.y, width: tile.size, height: tile.size + LABEL_HEIGHT };
+  const physical = dipToPhysicalRect(dip);
+  const result = await attachWindow(win, physical.x, physical.y, physical.width, physical.height);
+  if (!result || !result.ok) {
+    desktopAttached.delete(tile.id);
+    if (!desktopAttachWarned.has(tile.id)) {
+      desktopAttachWarned.add(tile.id);
+      log('desktop attach failed:', tile.id, (result && result.error) || 'unknown');
+    }
+    return false;
+  }
+  desktopAttachWarned.delete(tile.id);
+  desktopAttached.add(tile.id);
+  desktopRects.set(tile.id, dip);
+  log('desktop attach ok:', tile.id, 'parent', result.parent);
+  return true;
+}
+
+async function detachTileWindow(win, tile) {
+  if (!desktopAttached.has(tile.id)) return;
+  const dip = desktopRects.get(tile.id) || { x: tile.x, y: tile.y, width: tile.size, height: tile.size + LABEL_HEIGHT };
+  const physical = dipToPhysicalRect(dip);
+  await detachWindow(win, physical.x, physical.y, physical.width, physical.height);
+  desktopAttached.delete(tile.id);
+  desktopRects.delete(tile.id);
+  log('desktop detach:', tile.id);
+}
+
+function moveTileNative(win, tile, dipRect) {
+  const physical = dipToPhysicalRect(dipRect);
+  moveWindow(win, physical.x, physical.y, physical.width, physical.height);
+  desktopRects.set(tile.id, { x: dipRect.x, y: dipRect.y, width: dipRect.width, height: dipRect.height });
+  tile.x = dipRect.x;
+  tile.y = dipRect.y;
+}
+
+function animateAttachedPosition(win, tile, target, duration = 120) {
+  return new Promise((resolve) => {
+    const start = tileWindowDipRect(tile, win);
+    const dx = target.x - start.x;
+    const dy = target.y - start.y;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+      moveTileNative(win, tile, { ...start, x: target.x, y: target.y });
+      return resolve();
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (!win || win.isDestroyed() || !desktopAttached.has(tile.id)) {
+        clearInterval(timer);
+        return resolve();
+      }
+      const t = Math.min(1, (Date.now() - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      moveTileNative(win, tile, {
+        x: Math.round(start.x + dx * eased),
+        y: Math.round(start.y + dy * eased),
+        width: start.width,
+        height: start.height
+      });
+      if (t >= 1) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 16);
+  });
+}
+
+// Explorer 重启 / 桌面窗口重建 / 锁屏回来：把掉线的瓦片重新挂回桌面层
+async function refreshDesktopAttachments(reason) {
+  if (!desktopTileMode() || quitting || rebuilding) return;
+  for (const [tileId, win] of tileWindows) {
+    if (!win || win.isDestroyed()) continue;
+    const tile = tileById(tileId);
+    if (!tile) continue;
+    if (!desktopAttached.has(tileId)) {
+      await attachTileWindow(win, tile);
+      continue;
+    }
+    const health = await windowHealth(win);
+    if (!health.alive || !health.parentAlive || (!health.visible && tilesVisible)) {
+      log('desktop tile unhealthy, re-attaching:', tileId, JSON.stringify(health), reason || '');
+      desktopAttached.delete(tileId);
+      await attachTileWindow(win, tile, { force: true });
+      if (tilesVisible) await showWindow(win);
+    }
+  }
+}
+
+function startDesktopSupport() {
+  if (desktopWatchTimer) return;
+  desktopWatchTimer = setInterval(() => {
+    refreshDesktopAttachments('watch').catch(() => {});
+  }, 2500);
+  if (desktopWatchTimer.unref) desktopWatchTimer.unref();
+  try {
+    screen.on('display-metrics-changed', () => {
+      refreshDesktopAttachments('display-change').catch(() => {});
+    });
+  } catch { /* ignore */ }
+  try {
+    const { powerMonitor } = require('electron');
+    if (powerMonitor) powerMonitor.on('unlock-screen', () => refreshDesktopAttachments('unlock').catch(() => {}));
+  } catch { /* ignore */ }
+}
+
 function occupiedGridCells(exceptTileId) {
   const metrics = tileGridMetrics();
   const occupied = new Set();
@@ -374,6 +512,7 @@ function animateWindowPosition(win, target, duration = 120) {
 
 // 让瓦片始终待在普通窗口的 z-order 最底层（像桌面图标一样，不会盖住其它软件）
 function bottomAllTiles() {
+  if (desktopTileMode()) return;
   for (const win of tileWindows.values()) {
     if (!win || win.isDestroyed()) continue;
     if (shouldTopmost()) topmostWindow(win);
@@ -390,12 +529,33 @@ async function createTileWindowFor(tile) {
     log('tile renderer loaded', tile.id, win.getBounds());
   });
   win.once('ready-to-show', () => {
+    if (desktopTileMode()) {
+      attachTileWindow(win, tile).then(async (attached) => {
+        if (win.isDestroyed()) return;
+        if (!attached) {
+          // 挂载失败：自动回退成普通窗口模式，保证瓦片还能用
+          log('desktop attach failed, fallback to window mode:', tile.id);
+          if (tilesVisible) win.showInactive();
+          setTimeout(() => { if (!win.isDestroyed()) bottomWindow(win); }, 120);
+          return;
+        }
+        if (tilesVisible) {
+          win.showInactive();
+          await showWindow(win);
+        } else {
+          win.hide();
+        }
+      }).catch((err) => log('desktop attach failed:', tile.id, err.message));
+      return;
+    }
     setTimeout(() => {
       if (!win.isDestroyed()) { if (shouldTopmost()) topmostWindow(win); else bottomWindow(win); }
     }, 120);
   });
   win.webContents.on('render-process-gone', (_event, details) => log('tile renderer gone', tile.id, details));
   win.on('closed', () => {
+    desktopAttached.delete(tile.id);
+    desktopRects.delete(tile.id);
     if (tileWindows.get(tile.id) === win) tileWindows.delete(tile.id);
   });
   await shown;
@@ -476,8 +636,13 @@ function openSettings() {
 
 function toggleTiles() {
   tilesVisible = !tilesVisible;
-  for (const win of tileWindows.values()) {
+  for (const [tileId, win] of tileWindows) {
     if (!win || win.isDestroyed()) continue;
+    if (desktopTileMode() && desktopAttached.has(tileId)) {
+      if (tilesVisible) showWindow(win).catch(() => {});
+      else hideWindow(win).catch(() => {});
+      continue;
+    }
     if (tilesVisible) {
       win.show();
       setTimeout(() => {
@@ -564,6 +729,8 @@ async function rebuildAll() {
       overlay = null;
     }
     overlayTileId = null;
+    desktopAttached.clear();
+    desktopRects.clear();
     for (const win of tileWindows.values()) {
       try { win.destroy(); } catch { /* ignore */ }
     }
@@ -823,21 +990,33 @@ function registerIpc() {
   ipcMain.on('tile:drag-start', (event) => {
     const tileId = senderTileId(event);
     const win = tileId ? tileWindows.get(tileId) : null;
-    if (!win) return;
-    dragStates.set(tileId, { base: win.getPosition(), cursor: screen.getCursorScreenPoint() });
+    const tile = tileId ? tileById(tileId) : null;
+    if (!win || !tile) return;
+    const attached = desktopTileMode() && desktopAttached.has(tileId);
+    const cursorPoint = screen.getCursorScreenPoint();
+    dragStates.set(tileId, {
+      base: attached ? [tile.x, tile.y] : win.getPosition(),
+      cursor: cursorPoint
+    });
   });
   ipcMain.on('tile:drag-move', (event, x, y) => {
     const tileId = senderTileId(event);
     const win = tileId ? tileWindows.get(tileId) : null;
+    const tile = tileId ? tileById(tileId) : null;
     const drag = tileId ? dragStates.get(tileId) : null;
-    if (!win || !drag) return;
+    if (!win || !tile || !drag) return;
     const workArea = screen.getPrimaryDisplay().workArea;
-    const bounds = win.getBounds();
+    const bounds = tileWindowDipRect(tile, win);
     const nextX = drag.base[0] + Math.round(x - drag.cursor.x);
     const nextY = drag.base[1] + Math.round(y - drag.cursor.y);
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) return;
     const clampedX = Math.min(Math.max(nextX, workArea.x), workArea.x + workArea.width - bounds.width);
     const clampedY = Math.min(Math.max(nextY, workArea.y), workArea.y + workArea.height - bounds.height);
-    win.setPosition(clampedX, clampedY);
+    if (desktopTileMode() && desktopAttached.has(tileId)) {
+      moveTileNative(win, tile, { x: clampedX, y: clampedY, width: bounds.width, height: bounds.height });
+    } else {
+      win.setPosition(clampedX, clampedY);
+    }
   });
   ipcMain.on('tile:drag-end', (event) => {
     const tileId = senderTileId(event);
@@ -845,11 +1024,22 @@ function registerIpc() {
     const tile = tileId ? tileById(tileId) : null;
     if (!win || !tile) return;
     dragStates.delete(tileId);
-    const [x, y] = win.getPosition();
+    const attached = desktopTileMode() && desktopAttached.has(tileId);
+    const rawCurrent = attached ? tileWindowDipRect(tile, win) : (() => { const [x, y] = win.getPosition(); return { x, y }; })();
+    const current = Number.isFinite(rawCurrent.x) && Number.isFinite(rawCurrent.y)
+      ? rawCurrent
+      : { x: tile.x, y: tile.y };
     const metrics = tileGridMetrics();
-    const snapped = snapPosition(x, y, metrics, occupiedGridCells(tileId));
+    const snapped = snapPosition(current.x, current.y, metrics, occupiedGridCells(tileId));
     tile.x = snapped.x;
     tile.y = snapped.y;
+    if (attached) {
+      animateAttachedPosition(win, tile, snapped).then(() => {
+        saveConfig(config);
+        log('tile snapped', tileId, { x: snapped.x, y: snapped.y, col: snapped.col, row: snapped.row });
+      }).catch(() => {});
+      return;
+    }
     animateWindowPosition(win, snapped).then(() => {
       saveConfig(config);
       log('tile snapped', tileId, { x: snapped.x, y: snapped.y, col: snapped.col, row: snapped.row });
@@ -870,7 +1060,13 @@ function registerIpc() {
       tile.x = snapped.x;
       tile.y = snapped.y;
       const win = tileWindows.get(tile.id);
-      if (win && !win.isDestroyed()) jobs.push(animateWindowPosition(win, snapped));
+      if (win && !win.isDestroyed()) {
+        if (desktopTileMode() && desktopAttached.has(tile.id)) {
+          jobs.push(animateAttachedPosition(win, tile, snapped));
+        } else {
+          jobs.push(animateWindowPosition(win, snapped));
+        }
+      }
     }
     await Promise.all(jobs);
     saveConfig(config);
@@ -1018,6 +1214,7 @@ async function bootstrap() {
   log('startup: tile ready in', Date.now() - PROCESS_START, 'ms');
   if (!isStage) {
     startTileWatcher();
+    startDesktopSupport();
     watchDesktopState(applyDesktopState);
     // 启动时瓦片窗口可能抢到前台，导致被判定成「有软件前台」而压到底层；把焦点还给桌面
     setTimeout(() => { focusDesktop(); }, 500);
@@ -1065,6 +1262,10 @@ app.on('before-quit', () => {
     clearInterval(tileWatchTimer);
     tileWatchTimer = null;
   }
+  if (desktopWatchTimer) {
+    clearInterval(desktopWatchTimer);
+    desktopWatchTimer = null;
+  }
   if (precreateTimer) clearTimeout(precreateTimer);
   for (const tileId of [...folderStates.keys()]) stopWatcher(tileId);
   if (tray) {
@@ -1082,6 +1283,9 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+
+
+
 
 
 

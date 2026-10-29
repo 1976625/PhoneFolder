@@ -116,7 +116,7 @@ function baseDefaults() {
     ],
     overlay: { columns: 3, rows: 3, dim: 0.42, blur: 26, theme: 'dark', background: 'wallpaper' },
     behavior: { openOnSingleClick: true },
-    app: { launchAtLogin: false, firstRunDone: true, keepVisibleOnShowDesktop: true }
+    app: { launchAtLogin: false, firstRunDone: true, keepVisibleOnShowDesktop: true, tileMode: 'window' }
   };
 }
 

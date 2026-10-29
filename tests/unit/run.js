@@ -123,6 +123,22 @@ test('sanitizeSettings 去重/夹取/默认值', () => {
   assert.strictEqual(out.overlay.blur, 8);
   assert.strictEqual(out.overlay.background, 'wallpaper');
   assert.strictEqual(out.app.launchAtLogin, true);
+  assert.strictEqual(out.app.tileMode, 'window');
+});
+
+test('sanitizeSettings 接受桌面级瓦片模式，非法值回落 window', () => {
+  const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+  const exists = (p) => p === 'D:\\deskTop';
+  const desktop = sanitizeSettings({
+    tiles: [{ folder: 'D:\\deskTop' }],
+    app: { tileMode: 'desktop' }
+  }, { displayBounds: bounds, pathExists: exists });
+  assert.strictEqual(desktop.app.tileMode, 'desktop');
+  const unknown = sanitizeSettings({
+    tiles: [{ folder: 'D:\\deskTop' }],
+    app: { tileMode: 'whatever' }
+  }, { displayBounds: bounds, pathExists: exists });
+  assert.strictEqual(unknown.app.tileMode, 'window');
 });
 
 test('sanitizeSettings 校验文件夹绝对路径/存在/至少一个', () => {
@@ -304,6 +320,8 @@ test('migrateConfig 已是 v5 时不做改动', () => {
   console.log(`\n${tests.length - failed}/${tests.length} passed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+
+
 
 
 

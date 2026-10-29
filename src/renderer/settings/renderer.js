@@ -153,6 +153,12 @@ function render() {
   // 系统
   $('autostart').checked = Boolean(draft.app && draft.app.launchAtLogin);
   $('keep-visible').checked = !(draft.app && draft.app.keepVisibleOnShowDesktop === false);
+  const desktopMode = Boolean(draft.app && draft.app.tileMode === 'desktop');
+  $('desktop-mode').checked = desktopMode;
+  $('keep-visible').disabled = desktopMode;
+  $('keep-visible-hint').textContent = desktopMode
+    ? '桌面级模式下瓦片由桌面层承载，Win+D 天然不会被收起，这里的开关不再生效。'
+    : '关闭后瓦片会和普通窗口一样被 Win+D 收起（更稳定，不会偶尔闪没）。';
 
   // 关于
   $('version').textContent = snapshot.version || '—';
@@ -187,6 +193,10 @@ function wireInputs() {
   });
   $('keep-visible').addEventListener('change', () => {
     draft.app.keepVisibleOnShowDesktop = $('keep-visible').checked;
+  });
+  $('desktop-mode').addEventListener('change', () => {
+    draft.app.tileMode = $('desktop-mode').checked ? 'desktop' : 'window';
+    render();
   });
 
   $('open-data').addEventListener('click', () => {
@@ -231,7 +241,8 @@ function wireInputs() {
       overlay: { ...draft.overlay },
       app: {
         launchAtLogin: $('autostart').checked,
-        keepVisibleOnShowDesktop: $('keep-visible').checked
+        keepVisibleOnShowDesktop: $('keep-visible').checked,
+        tileMode: $('desktop-mode').checked ? 'desktop' : 'window'
       }
     };
     const result = await window.phoneFolder.settingsSave(input);
