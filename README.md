@@ -4,7 +4,9 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 **默认空瓦片**：瓦片绑定一个独立收纳文件夹（默认在桌面同级的 `手机文件夹`，不在桌面里），把桌面上的文件/快捷方式拖进去即可收纳；也支持自定义绑定文件夹、多个瓦片（最多 24 个）。
 
-交互对标付费软件 DeskFolders，本项目免费自研。定位：不替代资源管理器，只在桌面上加一层「文件夹入口 + 展开层」。
+交互：单击瓦片展开，拖桌面文件进瓦片收纳，浮层内直接打开/排序/翻页。
+
+定位：不替代资源管理器，只在桌面上加一层「文件夹入口 + 展开层」。
 
 **当前版本：v0.12.1**（便携版已产出）。
 
@@ -39,10 +41,9 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 - 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
 - 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
 
-> **本机注意**：项目 `release/` 目录继承了当前会话的沙箱 ACL，直接在里面运行 EXE 会启动失败（没反应）。\n> v0.12.0 已解压部署到 `D:\\PhoneFolder\\PhoneFolder-0.12.0`，桌面快捷方式与开机自启都指向它。
-> 发布产物已复制到普通目录 **`D:\PhoneFolder\`**，请从那里双击运行：
-> `D:\PhoneFolder\PhoneFolder-0.11.0-portable.exe`。
-> 以后换新版也建议复制到该目录（或桌面等普通文件夹）再运行，不要直接在项目 `release/` 里点。
+> **本机注意**：项目 `release/` 目录继承了当前会话的沙箱 ACL，直接在里面运行 EXE 会启动失败（没反应）。
+> 当前版本 **v0.12.1** 已解压部署到 `D:\PhoneFolder\PhoneFolder-0.12.1`，桌面快捷方式与开机自启都指向它。
+> 发布产物也复制到了普通目录 **`D:\PhoneFolder\`**，请从那里双击运行；以后换新版也建议复制到该目录（或桌面等普通文件夹），不要直接在项目 `release/` 里点。
 
 ### 双击没反应时
 
@@ -60,7 +61,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 - 从浮层把条目拖回桌面 = 移出。
 - 查看/管理收纳文件夹：右键瓦片 → 「打开绑定文件夹」。
 - 想换成别的位置：右键瓦片 → 设置 → 对应瓦片行「更改」。
-- 旧配置自动迁移（v2/v3 → v4）：绑定桌面或桌面上隐藏收纳目录的瓦片，会改绑到新收纳目录；旧目录里的文件会合并搬过去，随后删掉空目录。**桌面文件不会被动**，位置/大小/外观保留。
+- 旧配置自动迁移（v2/v3 → v4 → v5）：绑定桌面或桌面上旧收纳目录的瓦片会改绑到新收纳目录，旧目录里的文件合并搬过去；v4 → v5 统一 128 尺寸并把坐标吸附到网格。**桌面文件不会被动**，位置/外观保留。
 
 ![空瓦片](shots/01-tile.png)
 ![空态面板](shots/03-overlay-open.png)
@@ -91,8 +92,9 @@ pnpm dist            # zip + portable，输出到 release/
 - **右键瓦片**：展开 / 打开绑定文件夹 / 重新扫描 / 添加瓦片 / 设置 / 删除此瓦片（多瓦片时）/ 退出
 - **浮层**：滚轮 / ←→ / 左右滑动翻页；单击条目打开（资源管理器），浮层自动收起；右键条目有「打开 / 在资源管理器中显示 / 复制路径」
 - **重命名**：点浮层里的大标题 → 直接输入，Enter 保存 / Esc 取消；清空则恢复文件夹名（最长 24 字）
-- **层级**：收起的瓦片始终压在其它软件窗口下面；点任务栏「显示桌面」/ Win+D 时瓦片保持可见，切回软件后自动回到下面
-- **显示名**：面板里快捷方式不显示 `.lnk` 后缀（文件本身不改名）；瓦片大小设置现在会真正改变图标卡片尺寸（64–128）
+- **层级（桌面级瓦片，当前默认）**：瓦片挂到 Windows 桌面层：Win+D / 显示桌面不会收起，且始终在普通软件窗口下面；挂载失败自动回退普通窗口模式
+- **层级（普通窗口模式）**：瓦片作为普通窗口压在其它软件下面；Win+D 时会收起（可在设置里切换模式）
+- **显示名**：面板里快捷方式不显示 `.lnk` 后缀（文件本身不改名）；瓦片尺寸固定 128px
 - **拖入（收纳）**：从桌面/资源管理器拖文件、快捷方式、文件夹到瓦片或浮层 → 移入瓦片绑定的文件夹（高亮 + 提示 + toast；重名自动 `(n)`；已在文件夹内跳过）
 - **快捷方式图标**：`.lnk` / `.exe` 显示软件真实图标（解析快捷方式目标后取图标，首次批量约 0.5–1.2s，之后缓存秒开）
 - **面板内排序**：按住条目拖动 → 条目跟手悬浮、其它条目平滑让位；拖到面板左右边缘停留约 0.4 秒自动翻到上一页/下一页，松手插入目标页并保存；拖出面板范围才是拖出
@@ -106,22 +108,22 @@ pnpm dist            # zip + portable，输出到 release/
 ## 测试
 
 ```powershell
-pnpm test                        # 排序/过滤/移入/设置校验/配置迁移单测（13 项）
-node scripts/e2e-drop.js         # E2E：桌面文件拖入瓦片（CDP 调真实 IPC）
-node scripts/e2e-settings.js     # E2E：多瓦片 + 自启注册表 + 设置窗口（结束会还原原配置）
-node scripts/diag-center.js      # 回归：连续打开浮层是否始终居中
-node scripts/e2e-rename.js       # E2E：点标题重命名 + 隐藏 .lnk 后缀
-node scripts/e2e-dragout.js      # E2E：真实鼠标从浮层拖到桌面（拖出）
-node scripts/e2e-reopen.js       # 回归：真实/程序化连续开合浮层 3 次
-node scripts/e2e-reorder.js      # E2E：面板内真实鼠标拖动排序并持久化
-node scripts/e2e-grid.js         # E2E：拖动瓦片后吸附到 130×148 网格
-node scripts/e2e-sort-dom.js     # E2E：排序拖动时条目跟随/让位/顺序保存
-node scripts/e2e-sort-page.js    # E2E：拖到边缘翻页、松手插入目标页\nnode scripts/e2e-desktop-mode.js # E2E：桌面级瓦片（Progman 子窗口、Win+D、点击、拖动）
+pnpm test                         # 单测：设置校验/配置迁移/排序/网格/tileMode 等（21 项）
+node scripts/e2e-drop.js          # E2E：桌面文件拖入瓦片（CDP 调真实 IPC）
+node scripts/e2e-settings.js      # E2E：多瓦片 + 自启注册表 + 设置窗口（结束会还原原配置）
+node scripts/e2e-rename.js        # E2E：点标题重命名 + 隐藏 .lnk 后缀
+node scripts/e2e-dragout.js       # E2E：真实鼠标从浮层拖到桌面（拖出）
+node scripts/e2e-reopen.js        # 回归：真实/程序化连续开合浮层 3 次
+node scripts/e2e-reorder.js       # E2E：面板内真实鼠标拖动排序并持久化
+node scripts/e2e-grid.js          # E2E：拖动瓦片后吸附到 130×148 网格
+node scripts/e2e-sort-dom.js      # E2E：排序拖动时条目跟随/让位/顺序保存
+node scripts/e2e-sort-page.js     # E2E：拖到面板边缘翻页、松手插入目标页
+node scripts/e2e-desktop-mode.js  # E2E：桌面级瓦片（Progman 子窗口、Win+D、点击、拖动）
 ```
 
 ## 配置
 
-`%APPDATA%\phone-folder\config.json`（v4）：
+`%APPDATA%\phone-folder\config.json`（v5）：
 
 ```json
 {
@@ -131,16 +133,18 @@ node scripts/e2e-sort-page.js    # E2E：拖到边缘翻页、松手插入目标
   ],
   "overlay": { "columns": 3, "rows": 3, "dim": 0.42, "blur": 26, "theme": "dark", "background": "wallpaper" },
   "behavior": { "openOnSingleClick": true },
-  "app": { "launchAtLogin": false, "firstRunDone": true }
+  "app": { "launchAtLogin": false, "firstRunDone": true, "keepVisibleOnShowDesktop": true, "tileMode": "desktop" }
 }
 ```
 
 - `tiles[].name` 可选：自定义显示名（浮层点标题重命名写入，空则显示文件夹名）
 - `tiles[].order` 可选：面板内手动排序保存的文件名顺序（新文件自动排在末尾）
+- `app.tileMode`：`desktop` = 桌面级瓦片（当前默认，挂 Progman 子窗口）；`window` = 普通窗口模式
+- `app.keepVisibleOnShowDesktop`：普通窗口模式的兼容字段（默认 true），桌面级模式下不再使用
 - v2 → v3：绑定桌面的瓦片改绑收纳文件夹
 - v3 → v4：桌面内隐藏收纳目录（旧默认「手机文件夹」/隐藏目录）迁到桌面同级的 `手机文件夹`，内容合并搬迁
 - v4 → v5：瓦片尺寸统一 128，坐标吸附到网格
-- 瓦片位置拖动自动写回；设置页保存时统一重编号 `t1..tN`
+- 瓦片位置拖动自动写回；设置页保存时统一重编号 `t1..tN`（最多 24 个）
 - 瓦片尺寸固定 128（`tiles[].size` 仅保留兼容）；位置由网格吸附产生（workArea + 8px，单元格 130×148）
 - `overlay.dim`（0.15–0.7 压暗）、`overlay.blur`（8–48px）、`overlay.background` 背景方案
 - 配置损坏会备份成 `config.broken-<时间>.json` 并回默认值；数值越界自动夹取
@@ -171,48 +175,27 @@ node scripts/e2e-sort-page.js    # E2E：拖到边缘翻页、松手插入目标
 D:\deskTop\phoneS\
 ├─ package.json / .npmrc / .gitignore / electron-builder.yml
 ├─ assets\                 icon.ico / icon.png（托盘与窗口图标）
-├─ docs\                   开发计划 + P1~P5 + v0.6/v0.7 进展
-├─ scripts\                诊断 / E2E / 截图辅助脚本
+├─ docs\                   开发计划 + P1~P5 + v0.6~v0.12 进展
+├─ scripts\                E2E / 诊断 / 截图辅助脚本
 ├─ shots\                  截图产物（gitignore）
 ├─ release\                打包产物（gitignore）
 ├─ src\
 │  ├─ main\
 │  │  ├─ main.js           生命周期、多瓦片、托盘、设置、自启、IPC
 │  │  ├─ windows\          tile / overlay / backdrop / settings 窗口
-│  │  └─ services\         config / folder / icons / fsops / settings / background / logger
+│  │  └─ services\         config / folder / icons / fsops / settings / background / shortcut-icons / grid / native-window / logger
 │  ├─ preload\             contextBridge 最小 API
 │  └─ renderer\            tile / overlay / backdrop / settings 页面
 └─ tests\unit\run.js       单元测试
 ```
 
-## 已知限制（v2 可选项）
+## 已知限制（v0.12.1）
 
 - 未签名 → SmartScreen 首次提示；无自动更新
-- 瓦片是普通窗口：会被其他窗口盖住；Win+D 显示桌面时会被一起藏起来（可选 P6「真占格」）
+- 桌面级瓦片为**实验特性**：仅主显示器；多显示器 / 混合 DPI 未适配；Explorer 重启、锁屏、分辨率变化会自动重挂，极端情况下可能需要重启应用
+- 普通窗口模式（设置里切回）：瓦片会被其他窗口盖住，Win+D 显示桌面时会被一起收起
 - 收纳是**移动**语义：文件从桌面移进收纳文件夹（仍在本地，可打开/移出）
 - 默认收纳目录在桌面同级；若你手动把它改成桌面里的文件夹，它会正常显示在桌面上（这是你的显式选择）
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件（拖到桌面会删掉源文件，拖到其它位置是复制）
-- 瓦片层级用前台窗口启发式判断（显示桌面状态保持可见、其它时候压到软件下面）；彻底方案见 P6「真占格」
-- 多显示器未适配；网格按主屏 workArea 计算，换分辨率/任务栏位置可在设置里「重新对齐到网格」
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- 网格按主屏 workArea 计算，换分辨率/任务栏位置可在设置里「重新对齐到网格」；瓦片上限 24 个
 
