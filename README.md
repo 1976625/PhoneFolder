@@ -78,11 +78,11 @@ drag and drop file organizer
 
 ## 效果预览 / Screenshot Preview
 
-![桌面瓦片（桌面级模式）](docs/images/desktop-tiles.png)
+![桌面瓦片（桌面级模式）](images/desktop-tiles.png)
 
-![浮层展开（壁纸模糊 + 毛玻璃网格）](docs/images/overlay-panel.png)
+![浮层展开（壁纸模糊 + 毛玻璃网格）](images/overlay-panel.png)
 
-![设置页](docs/images/settings.png)
+![设置页](images/settings.png)
 
 ## 当前进度 / Current Progress
 
@@ -100,8 +100,7 @@ drag and drop file organizer
 | v0.8 交互细节 | ✅ 完成 | 修复 hover 顶部裁切、瓦片大小真正生效；点浮层标题重命名；面板隐藏 `.lnk` 后缀 |
 | v0.10–v0.12 | ✅ 完成 | 拖出改为 pointer 触发原生拖拽；桌面级瓦片（Progman 子窗口）；v0.12.2 修复桌面级瓦片偶尔不显示 / 被遮挡停止绘制 / 鼠标输入丢失 |
 
-- 开发计划：[docs/开发计划.md](docs/开发计划.md)
-- 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md) · [v0.7](docs/v0.7-进展.md)
+- 开发计划与阶段记录保存在本地 `docs/` 目录（不纳入仓库）。
 
 ## 发布 / 直接使用 / Release / Run
 
@@ -235,5 +234,7 @@ PhoneFolder – desktop folder organizer
 PhoneFolder – file storage box for Windows
 
 PhoneFolder – phone-style folder tile for desktop organization
+
+
 
 
