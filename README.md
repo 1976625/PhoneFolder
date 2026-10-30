@@ -1,16 +1,47 @@
 # PhoneFolder
 
-Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整屏压暗、壁纸模糊，瓦片原地放大成毛玻璃网格；点面板外 / Esc 收起。
+PhoneFolder is an open-source Windows desktop utility for managing a phone folder on the desktop, with Android file access, drag-and-drop organization, and a clean desktop-side file storage experience.
 
-**默认空瓦片**：瓦片绑定一个独立收纳文件夹（默认在桌面同级的 `手机文件夹`，不在桌面里），把桌面上的文件/快捷方式拖进去即可收纳；也支持自定义绑定文件夹、多个瓦片（最多 24 个）。
+Windows + Android + desktop file manager + phone folder access + open source project
 
-交互：单击瓦片展开，拖桌面文件进瓦片收纳，浮层内直接打开/排序/翻页。
+PhoneFolder helps you keep a phone folder on your Windows desktop like a convenient local file area. You can drag files, folders, and shortcuts into the tile, open items directly from Windows Explorer, and organize your phone content without replacing the default File Explorer.
 
-定位：不替代资源管理器，只在桌面上加一层「文件夹入口 + 展开层」。
+## What is PhoneFolder?
 
-**当前版本：v0.12.1**（便携版已产出）。
+PhoneFolder is a lightweight Windows desktop app that adds a persistent tile on the desktop. It acts as a dedicated “phone folder” entry point, allowing you to collect and manage files from your phone in a simple, visual way.
 
-## 效果预览
+This project is designed for users who want:
+
+- a phone folder accessible from the Windows desktop
+- drag-and-drop file organization on the desktop
+- a dedicated place for mobile files without cluttering the desktop
+- an open-source desktop software for phone storage management
+- a lightweight UI for managing files without opening full file managers
+
+## Core Features
+
+- Desktop tile entry for a phone folder
+- File and folder collection from the desktop
+- Drag items into the folder and move them back out
+- Open files directly in Windows Explorer
+- Bind a custom folder and manage it easily
+- Multi-tile support with up to 24 tiles
+- Desktop-level tile mode and normal window mode
+- Tray icon integration and one-click show/hide
+- Windows desktop interaction with blur, dimming, and glass effects
+
+## Project Focus
+
+PhoneFolder is not a replacement for Windows Explorer. Instead, it adds a desktop “folder portal” that keeps your phone-related files in one visual and easy-to-use place.
+
+It is especially useful for:
+
+- desktop users who want quick access to phone files
+- Android users who want a convenient Windows-side folder workflow
+- people who prefer drag-and-drop desktop organization
+- open-source software enthusiasts who want a simple Windows desktop utility
+
+## Screenshot Preview
 
 ![桌面瓦片（桌面级模式）](docs/images/desktop-tiles.png)
 
@@ -18,7 +49,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 ![设置页](docs/images/settings.png)
 
-## 当前进度
+## Current Progress
 
 | 阶段 | 状态 | 说明 |
 |---|---|---|
@@ -29,183 +60,127 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 | P4 系统集成 | ✅ 完成 | 托盘、设置页、开机自启、单实例、多瓦片（≤24） |
 | P5 打磨打包 | ✅ 完成 | 性能实测、内存优化、electron-builder 便携版 |
 | v0.6 行为修正 | ✅ 完成 | 默认空瓦片 + 从桌面拖入收纳（旧配置自动迁移）；空瓦片去图标、面板同款实线玻璃边；修复二次打开不居中 |
-| v0.7 收纳位置 | ✅ 完成 | 收纳文件夹移出桌面（放到桌面同级，如同盘 `D:\手机文件夹`）；旧隐藏目录自动迁移清空，开「显示隐藏项目」也不会出现在桌面 |
-| v0.7.1 图标修复 | ✅ 完成 | `.lnk` / `.exe` 显示真实软件图标（解析快捷方式目标 + `ExtractAssociatedIcon` 批量取图，缓存 + 扫描预热） |
+| v0.7 收纳位置 | ✅ 完成 | 收纳文件夹移出桌面（放到桌面同级，如同盘 `D:\手机文件夹`）；旧隐藏目录自动迁移清空 |
+| v0.7.1 图标修复 | ✅ 完成 | `.lnk` / `.exe` 显示真实软件图标 |
 | v0.8 交互细节 | ✅ 完成 | 修复 hover 顶部裁切、瓦片大小真正生效；点浮层标题重命名；面板隐藏 `.lnk` 后缀 |
-| v0.10–v0.12 | ✅ 完成 | 拖出改为 pointer 触发原生拖拽（拖到桌面=移出）；瓦片压在软件之下、显示桌面时保持可见；v0.9.1 修复「只能打开一次」；v0.9.2 文件夹缩略图黑色背景抠透明、统一半透明玻璃效果；v0.9.3 面板内拖动改为排序、拖出面板范围才是拖出；v0.9.4 设置页同步新能力（显示名/打开目录/重置排序/显示桌面可见开关/关于）；v0.10.0 尺寸固定 128 + 桌面图标式网格吸附；v0.10.1 网格间隔减半；v0.10.2 修复卡片尺寸变量被 body 覆盖（卡片实际 122px）并改为紧凑 130×148 网格；v0.10.3 排序拖拽改为跟手悬浮 + FLIP 平滑让位、几何命中更准；v0.11.0 拖到面板左右边缘自动翻页；v0.12.0 桌面级瓦片（Progman 子窗口，实验）；v0.12.1 瓦片上限 6→24、移除「显示桌面保持可见」设置项 |
+| v0.10–v0.12 | ✅ 完成 | 拖出改为 pointer 触发原生拖拽；桌面级瓦片优化；修复重复打开问题 |
 
 - 开发计划：[docs/开发计划.md](docs/开发计划.md)
-- 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md) · [v0.7](docs/v0.7-进展.md) · [v0.8](docs/v0.8-进展.md) · [v0.9](docs/v0.9-进展.md) · [v0.10](docs/v0.10-进展.md) · [v0.12](docs/v0.12-进展.md)
+- 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md) · [v0.7](docs/v0.7-进展.md)
 
-## 发布 / 直接使用
+## Release / Run
 
 | 产物 | 大小 | 用法 |
 |---|---|---|
 | `release/PhoneFolder-0.12.1-setup.exe` | 102.8 MB | 安装版：双击安装（当前用户，无需管理员），自动创建桌面/开始菜单快捷方式 |
-| `release/PhoneFolder-0.12.1-portable.exe` | 93.6 MB | **双击即用**（自解压到临时目录运行） |
+| `release/PhoneFolder-0.12.1-portable.exe` | 93.6 MB | 双击即用（自解压到临时目录运行） |
 | `release/PhoneFolder-0.12.1-win.zip` | 133.1 MB | 解压后运行 `win-unpacked/PhoneFolder.exe` |
 
 - SHA-256 前 16 位：setup `C37FF5CC7493A9C0` · portable `5BDEBB4EAE7E7183` · zip `95DB9C2858CFB6B3`
 - 未签名，首次运行 SmartScreen 提示 → 「更多信息 → 仍要运行」
-- 配置目录与开发版共用：`%APPDATA%\phone-folder\config.json`
-- 便携版开机自启会指向 portable exe 本身；托盘菜单可退出
+- 配置目录：`%APPDATA%\phone-folder\config.json`
 
-> **本机注意**：项目 `release/` 目录继承了当前会话的沙箱 ACL，直接在里面运行 EXE 会启动失败（没反应）。
-> 当前版本 **v0.12.1** 已解压部署到 `D:\PhoneFolder\PhoneFolder-0.12.1`，桌面快捷方式与开机自启都指向它。
-> 发布产物也复制到了普通目录 **`D:\PhoneFolder\`**，请从那里双击运行；以后换新版也建议复制到该目录（或桌面等普通文件夹），不要直接在项目 `release/` 里点。
+> 本机注意：项目 `release/` 目录继承了当前会话的沙箱 ACL，直接在里面运行 EXE 会启动失败（没反应）。
+> 当前版本已解压部署到 `D:\PhoneFolder\PhoneFolder-0.12.1`，桌面快捷方式与开机自启都指向它。
 
-### 双击没反应时
+## Default Behavior: Empty Tile + Storage Folder
 
-1. 可能已经有一个实例在后台（托盘图标里）——双击只会激活旧实例；右键托盘 → 退出，再启动；
-2. 查看日志 `%APPDATA%\phone-folder\logs\app.log` 是否有 `second instance detected` / `startup: tile ready`；
-3. 确认 EXE 位于普通文件夹（不要放在项目的 `release/` 目录里）。
-
-## 默认行为：空瓦片 + 收纳
-
-- 收纳文件夹在**桌面目录的同级**：本机桌面是 `D:\deskTop`，所以收纳目录是 **`D:\手机文件夹`**（普通文件夹，不隐藏）。
-  - 它不在桌面里，所以无论是否开启「显示隐藏的项目」，桌面都不会冒出收纳文件夹；
-  - 它与桌面**同一磁盘**，从桌面拖入是 `rename`，大文件/文件夹瞬间移动，不跨盘复制。
-- 首次启动自动创建这个目录，瓦片绑定它 → **默认是空的**（实线玻璃边缘、无图标）。
-- **从桌面把文件/快捷方式/文件夹拖到瓦片上** → 移进收纳文件夹：桌面图标消失、瓦片里出现。
+- 收纳文件夹在**桌面目录的同级**：本机桌面是 `D:\deskTop`，所以收纳目录是 **`D:\手机文件夹`**。
+- 首次启动自动创建这个目录，瓦片绑定它 → 默认是空的。
+- 从桌面把文件/快捷方式/文件夹拖到瓦片上 → 移进收纳文件夹。
 - 从浮层把条目拖回桌面 = 移出。
-- 查看/管理收纳文件夹：右键瓦片 → 「打开绑定文件夹」。
-- 想换成别的位置：右键瓦片 → 设置 → 对应瓦片行「更改」。
-- 旧配置自动迁移（v2/v3 → v4 → v5）：绑定桌面或桌面上旧收纳目录的瓦片会改绑到新收纳目录，旧目录里的文件合并搬过去；v4 → v5 统一 128 尺寸并把坐标吸附到网格。**桌面文件不会被动**，位置/外观保留。
+- 右键瓦片 → 「打开绑定文件夹」可查看管理目录。
 
-更多效果图见上方「[效果预览](#效果预览)」。
-
-## 开发运行
+## Development
 
 ```powershell
-pnpm install    # 首次
-pnpm start      # 启动：桌面出现瓦片 + 任务栏托盘图标
-pnpm shot       # 自动截图到 shots/（瓦片态 → 展开中 → 展开态 → 收起后）
+pnpm install
+pnpm start
+pnpm shot
 ```
 
-> 注意：本机 DSH 终端里 `ELECTRON_RUN_AS_NODE=1`，启动前需清掉该环境变量，否则 Electron 会以 Node 模式运行：
-> `Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue; pnpm start`
-
-## 打包
+## Build
 
 ```powershell
 $env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
 $env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'
-pnpm dist            # zip + portable，输出到 release/
+pnpm dist
 ```
 
-## 交互
+## Interaction
 
-- **单击瓦片**：展开浮层；再点瓦片位置 / 点面板外 / 按 Esc：收起
-- **拖动瓦片**：自由跟随移动，松手自动吸附到网格（单元格 130×148，自动避开任务栏、不会重叠）
-- **右键瓦片**：展开 / 打开绑定文件夹 / 重新扫描 / 添加瓦片 / 设置 / 删除此瓦片（多瓦片时）/ 退出
-- **浮层**：滚轮 / ←→ / 左右滑动翻页；单击条目打开（资源管理器），浮层自动收起；右键条目有「打开 / 在资源管理器中显示 / 复制路径」
-- **重命名**：点浮层里的大标题 → 直接输入，Enter 保存 / Esc 取消；清空则恢复文件夹名（最长 24 字）
-- **层级（桌面级瓦片，当前默认）**：瓦片挂到 Windows 桌面层：Win+D / 显示桌面不会收起，且始终在普通软件窗口下面；挂载失败自动回退普通窗口模式
-- **层级（普通窗口模式）**：瓦片作为普通窗口压在其它软件下面；Win+D 时会收起（可在设置里切换模式）
-- **显示名**：面板里快捷方式不显示 `.lnk` 后缀（文件本身不改名）；瓦片尺寸固定 128px
-- **拖入（收纳）**：从桌面/资源管理器拖文件、快捷方式、文件夹到瓦片或浮层 → 移入瓦片绑定的文件夹（高亮 + 提示 + toast；重名自动 `(n)`；已在文件夹内跳过）
-- **快捷方式图标**：`.lnk` / `.exe` 显示软件真实图标（解析快捷方式目标后取图标，首次批量约 0.5–1.2s，之后缓存秒开）
-- **面板内排序**：按住条目拖动 → 条目跟手悬浮、其它条目平滑让位；拖到面板左右边缘停留约 0.4 秒自动翻到上一页/下一页，松手插入目标页并保存；拖出面板范围才是拖出
-- **拖出**：按住条目拖出面板到桌面/资源管理器 → 移出（单文件；会自动收起浮层，拖到桌面后源文件会被删除实现「移出」）
-- **托盘**：左键切换瓦片显示/隐藏；右键菜单：显示/隐藏瓦片、打开设置、打开绑定文件夹、重新扫描、退出
-- **桌面级瓦片（实验）**：设置 → 系统里开启后，瓦片挂到 Windows 桌面层（Progman 子窗口），Win+D 不会收起、始终在软件窗口下面；挂载失败会自动回退普通窗口模式
-- **设置页**：瓦片增删/更换文件夹/改显示名/打开目录/重置排序（≤24，同一文件夹去重）、背景模式、压暗程度、模糊强度、开机自启、桌面级瓦片（实验）开关、「重新对齐到网格」、版本与配置目录
-- **文件变化**：文件夹增删改 300ms 内自动刷新浮层和瓦片预览
-- 空文件夹、文件夹被删/无权限都有中文提示
+- 单击瓦片：展开浮层；再点瓦片位置 / 点面板外 / 按 Esc：收起
+- 拖动瓦片：自由跟随移动，松手自动吸附到网格
+- 右键瓦片：展开 / 打开绑定文件夹 / 重新扫描 / 添加瓦片 / 设置 / 删除此瓦片 / 退出
+- 浮层：滚轮 / ←→ / 左右滑动翻页；单击条目打开
+- 重命名：点浮层里的大标题 → 直接输入，Enter 保存 / Esc 取消
+- 托盘：左键切换瓦片显示/隐藏；右键菜单：显示/隐藏瓦片、打开设置、打开绑定文件夹、重新扫描、退出
+- 设置页：瓦片增删/更换文件夹/改显示名/打开目录/重置排序等
+- 文件变化：文件夹内增删改 300ms 内自动刷新浮层和瓦片预览
 
-## 测试
+## Keywords / Search Terms
 
-```powershell
-pnpm test                         # 单测：设置校验/配置迁移/排序/网格/tileMode 等（21 项）
-node scripts/e2e-drop.js          # E2E：桌面文件拖入瓦片（CDP 调真实 IPC）
-node scripts/e2e-settings.js      # E2E：多瓦片 + 自启注册表 + 设置窗口（结束会还原原配置）
-node scripts/e2e-rename.js        # E2E：点标题重命名 + 隐藏 .lnk 后缀
-node scripts/e2e-dragout.js       # E2E：真实鼠标从浮层拖到桌面（拖出）
-node scripts/e2e-reopen.js        # 回归：真实/程序化连续开合浮层 3 次
-node scripts/e2e-reorder.js       # E2E：面板内真实鼠标拖动排序并持久化
-node scripts/e2e-grid.js          # E2E：拖动瓦片后吸附到 130×148 网格
-node scripts/e2e-sort-dom.js      # E2E：排序拖动时条目跟随/让位/顺序保存
-node scripts/e2e-sort-page.js     # E2E：拖到面板边缘翻页、松手插入目标页
-node scripts/e2e-desktop-mode.js  # E2E：桌面级瓦片（Progman 子窗口、Win+D、点击、拖动）
-```
+For better discoverability, the project is aligned with terms such as:
 
-## 配置
+- PhoneFolder
+- Windows phone folder
+- Android file folder on Windows
+- desktop phone storage
+- Windows file management
+- Android file access on desktop
+- open source phone folder app
+- Windows desktop file organizer
+- drag and drop phone files
+- mobile folder management
+- phone directory on desktop
+- file organizer for Android on Windows
 
-`%APPDATA%\phone-folder\config.json`（v5）：
+## Related Project Type
 
-```json
-{
-  "version": 5,
-  "tiles": [
-    { "id": "t1", "name": "我的收纳盒", "folder": "D:\\手机文件夹", "x": 1784, "y": 8, "size": 128, "opacity": 1 }
-  ],
-  "overlay": { "columns": 3, "rows": 3, "dim": 0.42, "blur": 26, "theme": "dark", "background": "wallpaper" },
-  "behavior": { "openOnSingleClick": true },
-  "app": { "launchAtLogin": false, "firstRunDone": true, "keepVisibleOnShowDesktop": true, "tileMode": "desktop" }
-}
-```
+This project fits the category of:
 
-- `tiles[].name` 可选：自定义显示名（浮层点标题重命名写入，空则显示文件夹名）
-- `tiles[].order` 可选：面板内手动排序保存的文件名顺序（新文件自动排在末尾）
-- `app.tileMode`：`desktop` = 桌面级瓦片（当前默认，挂 Progman 子窗口）；`window` = 普通窗口模式
-- `app.keepVisibleOnShowDesktop`：普通窗口模式的兼容字段（默认 true），桌面级模式下不再使用
-- v2 → v3：绑定桌面的瓦片改绑收纳文件夹
-- v3 → v4：桌面内隐藏收纳目录（旧默认「手机文件夹」/隐藏目录）迁到桌面同级的 `手机文件夹`，内容合并搬迁
-- v4 → v5：瓦片尺寸统一 128，坐标吸附到网格
-- 瓦片位置拖动自动写回；设置页保存时统一重编号 `t1..tN`（最多 24 个）
-- 瓦片尺寸固定 128（`tiles[].size` 仅保留兼容）；位置由网格吸附产生（workArea + 8px，单元格 130×148）
-- `overlay.dim`（0.15–0.7 压暗）、`overlay.blur`（8–48px）、`overlay.background` 背景方案
-- 配置损坏会备份成 `config.broken-<时间>.json` 并回默认值；数值越界自动夹取
+- open-source Windows desktop utility
+- Android file access helper
+- desktop file organizer
+- file management app for phone files
+- lightweight desktop storage portal
 
-## 背景模式
+## Directory Structure
 
-优先级：环境变量 `PF_BG` > 设置页选择 > 默认。
-
-| 值 | 做法 | 适用 |
-|---|---|---|
-| `wallpaper`（默认） | 读当前壁纸 → 缩 640 宽 → 渲染层 CSS 模糊 + 压暗 | 干净、不采集窗口内容、零延迟 |
-| `capture` | 抓当前桌面缩略图（会把开着的窗口一起模糊），缓存预热后打开 ≤150ms | 想要「模糊当前桌面」的实时感 |
-| `acrylic` | DWM acrylic 实时模糊 | 实验；Win11 浅色主题下偏奶白 |
-
-## 性能实测（本机 Win11 26H2 / 1920×1080 / 12 核）
-
-| 指标 | 实测 |
-|---|---|
-| 启动→瓦片可见 | 420–670ms |
-| 点击→浮层首帧 | 35–59ms（常见），偶发 ~240ms |
-| 展开动画帧率 | ~75fps |
-| 空闲 CPU | 0.01% |
-| 常驻内存 | 私有 241MB（开发）/ 258MB（打包），工作集约 417MB |
-
-## 目录结构
-
-```
+```text
 D:\deskTop\phoneS\
 ├─ package.json / .npmrc / .gitignore / electron-builder.yml
-├─ assets\                 icon.ico / icon.png（托盘与窗口图标）
-├─ docs\                   开发计划 + P1~P5 + v0.6~v0.12 进展；docs\images\ 效果图（README 引用）
+├─ assets\                 icon.ico / icon.png
+├─ docs\                   开发计划 + P1~P5 + v0.6~v0.12 进展
 ├─ scripts\                E2E / 诊断 / 截图辅助脚本
-├─ shots\                  截图产物（gitignore）
-├─ release\                打包产物（gitignore）
+├─ shots\                  截图产物
+├─ release\                打包产物
 ├─ src\
 │  ├─ main\
-│  │  ├─ main.js           生命周期、多瓦片、托盘、设置、自启、IPC
-│  │  ├─ windows\          tile / overlay / backdrop / settings 窗口
-│  │  └─ services\         config / folder / icons / fsops / settings / background / shortcut-icons / grid / native-window / logger
-│  ├─ preload\             contextBridge 最小 API
-│  └─ renderer\            tile / overlay / backdrop / settings 页面
-└─ tests\unit\run.js       单元测试
+│  │  ├─ main.js
+│  │  ├─ windows\
+│  │  └─ services\
+│  ├─ preload\
+│  └─ renderer\
+└─ tests\unit\run.js
 ```
 
-## 已知限制（v0.12.1）
+## Known Limitations
 
-- 未签名 → SmartScreen 首次提示；无自动更新
-- 桌面级瓦片为**实验特性**：仅主显示器；多显示器 / 混合 DPI 未适配；Explorer 重启、锁屏、分辨率变化会自动重挂，极端情况下可能需要重启应用
-- 普通窗口模式（设置里切回）：瓦片会被其他窗口盖住，Win+D 显示桌面时会被一起收起
-- 收纳是**移动**语义：文件从桌面移进收纳文件夹（仍在本地，可打开/移出）
-- 默认收纳目录在桌面同级；若你手动把它改成桌面里的文件夹，它会正常显示在桌面上（这是你的显式选择）
-- 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件（拖到桌面会删掉源文件，拖到其它位置是复制）
-- 网格按主屏 workArea 计算，换分辨率/任务栏位置可在设置里「重新对齐到网格」；瓦片上限 24 个
+- 未签名 → SmartScreen 首次提示
+- 桌面级瓦片为实验特性：仅主显示器；多显示器 / 混合 DPI 未适配
+- 收纳是移动语义：文件从桌面移进收纳文件夹
+- 默认收纳目录在桌面同级；若手动改到桌面中，则会显示在桌面中
+- 托盘「显示/隐藏瓦片」不持久化
 
+## Summary
 
+PhoneFolder is an open-source desktop utility for creating a Windows phone folder experience, giving users a desktop-side folder for Android content and convenient drag-and-drop file management.
 
+It is designed for people who want a practical, lightweight way to organize mobile files from the desktop without replacing the normal Windows file browser.
+
+PhoneFolder – Windows Phone Folder for Desktop
+
+PhoneFolder – Android file access and organization on Windows
+
+PhoneFolder – open source Windows desktop utility for phone folder management
