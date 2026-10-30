@@ -1,47 +1,82 @@
 # PhoneFolder
 
-PhoneFolder is an open-source Windows desktop utility for managing a phone folder on the desktop, with Android file access, drag-and-drop organization, and a clean desktop-side file storage experience.
+PhoneFolder 是一个 Windows 桌面工具，它在桌面上创建一个“像手机文件夹一样”的收纳盒/瓦片，用来管理文件、文件夹和快捷方式，方便把桌面杂物放进一个统一入口中进行整理和访问。
 
-Windows + Android + desktop file manager + phone folder access + open source project
+PhoneFolder is a Windows desktop utility that creates a “phone-folder-style” storage box on the desktop. It helps manage files, folders, and shortcuts in a compact desktop entry, making it easy to organize clutter and keep important items in one place.
 
-PhoneFolder helps you keep a phone folder on your Windows desktop like a convenient local file area. You can drag files, folders, and shortcuts into the tile, open items directly from Windows Explorer, and organize your phone content without replacing the default File Explorer.
+PhoneFolder / 手机文件夹 / desktop folder organizer / file box / file storage box / desktop collection box / folder tile / desktop file organizer / drag and drop organizer / Windows desktop folder box / phone-style folder tile / file and folder manager
 
-## What is PhoneFolder?
+## 项目简介 / Overview
 
-PhoneFolder is a lightweight Windows desktop app that adds a persistent tile on the desktop. It acts as a dedicated “phone folder” entry point, allowing you to collect and manage files from your phone in a simple, visual way.
+PhoneFolder 不负责管理手机本体，也不替代资源管理器。它的作用是为 Windows 桌面增加一个“文件盒子”入口：你可以把文件、文件夹、快捷方式拖进去，像手机文件夹一样统一收纳，并在需要时直接打开。
 
-This project is designed for users who want:
+PhoneFolder does not manage a phone itself and does not replace File Explorer. Instead, it adds a “file box” entry to the Windows desktop. You can drag files, folders, and shortcuts into it, store them in one place, and open them when needed.
 
-- a phone folder accessible from the Windows desktop
-- drag-and-drop file organization on the desktop
-- a dedicated place for mobile files without cluttering the desktop
-- an open-source desktop software for phone storage management
-- a lightweight UI for managing files without opening full file managers
+它更像是：
 
-## Core Features
+- 桌面文件收纳盒
+- 文件夹入口
+- 桌面整理工具
+- 文件/快捷方式收纳区
+- 文件管理型桌面组件
 
-- Desktop tile entry for a phone folder
-- File and folder collection from the desktop
-- Drag items into the folder and move them back out
-- Open files directly in Windows Explorer
-- Bind a custom folder and manage it easily
-- Multi-tile support with up to 24 tiles
-- Desktop-level tile mode and normal window mode
-- Tray icon integration and one-click show/hide
-- Windows desktop interaction with blur, dimming, and glass effects
+It is more like:
 
-## Project Focus
+- a desktop file storage box
+- a folder entry on the desktop
+- a desktop organization tool
+- a file and shortcut collection area
+- a visual file management component for Windows
 
-PhoneFolder is not a replacement for Windows Explorer. Instead, it adds a desktop “folder portal” that keeps your phone-related files in one visual and easy-to-use place.
+## 主要功能 / Features
 
-It is especially useful for:
+- 在桌面上显示一个“像手机文件夹一样”的收纳盒
+- 管理文件、文件夹和快捷方式
+- 拖动文件进盒子，统一收纳
+- 拖出文件到桌面或资源管理器
+- 支持按需打开、排序、重命名、查看
+- 适合压缩桌面杂物
+- 提供简洁的桌面交互体验
+- 不替代资源管理器，仅作为桌面入口
 
-- desktop users who want quick access to phone files
-- Android users who want a convenient Windows-side folder workflow
-- people who prefer drag-and-drop desktop organization
-- open-source software enthusiasts who want a simple Windows desktop utility
+- show a “phone-folder-style” box on the desktop
+- manage files, folders, and shortcuts
+- drag files into the box for centralized storage
+- drag files out to the desktop or Explorer
+- support open, sort, rename, and browse
+- help reduce desktop clutter
+- offer a clean desktop interaction experience
+- act as a file entry instead of replacing File Explorer
 
-## Screenshot Preview
+## 适用场景 / Use Cases
+
+- 桌面文件收纳 / desktop file organization
+- 文件夹整理 / folder organization
+- 快捷方式收纳 / shortcut collection
+- 桌面清理工具 / desktop cleanup tool
+- 文件盒子 / file box
+- 个人桌面文件入口 / personal desktop file entry
+- 像手机文件夹一样的收纳体验 / phone-folder-style desktop storage experience
+
+## 关键词 / Search Terms
+
+PhoneFolder
+
+desktop file box
+desktop folder organizer
+file storage box
+folder tile
+phone-folder-style desktop app
+Windows desktop file organizer
+desktop file collection
+file and folder organizer
+desktop shortcut organizer
+folder entry on desktop
+desktop storage box
+Windows folder tile
+drag and drop file organizer
+
+## 效果预览 / Screenshot Preview
 
 ![桌面瓦片（桌面级模式）](docs/images/desktop-tiles.png)
 
@@ -49,7 +84,7 @@ It is especially useful for:
 
 ![设置页](docs/images/settings.png)
 
-## Current Progress
+## 当前进度 / Current Progress
 
 | 阶段 | 状态 | 说明 |
 |---|---|---|
@@ -68,7 +103,7 @@ It is especially useful for:
 - 开发计划：[docs/开发计划.md](docs/开发计划.md)
 - 阶段记录：[P1](docs/P1-进展.md) · [P2](docs/P2-进展.md) · [P3](docs/P3-进展.md) · [P4](docs/P4-进展.md) · [P5](docs/P5-进展.md) · [v0.6](docs/v0.6-进展.md) · [v0.7](docs/v0.7-进展.md)
 
-## Release / Run
+## 发布 / 直接使用 / Release / Run
 
 | 产物 | 大小 | 用法 |
 |---|---|---|
@@ -83,7 +118,7 @@ It is especially useful for:
 > 本机注意：项目 `release/` 目录继承了当前会话的沙箱 ACL，直接在里面运行 EXE 会启动失败（没反应）。
 > 当前版本已解压部署到 `D:\PhoneFolder\PhoneFolder-0.12.1`，桌面快捷方式与开机自启都指向它。
 
-## Default Behavior: Empty Tile + Storage Folder
+## 默认行为：空瓦片 + 收纳 / Default Behavior: Empty Tile + Storage Folder
 
 - 收纳文件夹在**桌面目录的同级**：本机桌面是 `D:\deskTop`，所以收纳目录是 **`D:\手机文件夹`**。
 - 首次启动自动创建这个目录，瓦片绑定它 → 默认是空的。
@@ -91,7 +126,13 @@ It is especially useful for:
 - 从浮层把条目拖回桌面 = 移出。
 - 右键瓦片 → 「打开绑定文件夹」可查看管理目录。
 
-## Development
+- storage folder is placed at the same level as the desktop directory
+- first launch creates the folder automatically and binds it to the tile
+- dragging files, shortcuts, or folders onto the tile moves them into the storage folder
+- dragging items back out from the panel removes them from the folder
+- right-click the tile to open the bound folder
+
+## 开发运行 / Development
 
 ```powershell
 pnpm install
@@ -99,7 +140,7 @@ pnpm start
 pnpm shot
 ```
 
-## Build
+## 打包 / Build
 
 ```powershell
 $env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
@@ -107,7 +148,7 @@ $env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-bu
 pnpm dist
 ```
 
-## Interaction
+## 交互 / Interaction
 
 - 单击瓦片：展开浮层；再点瓦片位置 / 点面板外 / 按 Esc：收起
 - 拖动瓦片：自由跟随移动，松手自动吸附到网格
@@ -118,34 +159,36 @@ pnpm dist
 - 设置页：瓦片增删/更换文件夹/改显示名/打开目录/重置排序等
 - 文件变化：文件夹内增删改 300ms 内自动刷新浮层和瓦片预览
 
-## Keywords / Search Terms
+- click the tile to expand the floating panel; click the tile again, click outside the panel, or press Esc to collapse it
+- drag the tile to move it freely and snap to grid positions automatically
+- right-click the tile to expand, open the bound folder, rescan, add a new tile, open settings, remove the tile, or exit
+- the floating panel supports scroll / left-right navigation / page switching
+- rename items directly from the panel title area
+- tray icon provides quick show/hide, open settings, open folder, rescan, and exit
+- settings page supports adding/removing tiles, changing folders, renaming, and reordering
+- file changes refresh the panel and previews automatically
 
-For better discoverability, the project is aligned with terms such as:
+## 关键词补充 / Additional Search Keywords
 
-- PhoneFolder
-- Windows phone folder
-- Android file folder on Windows
-- desktop phone storage
-- Windows file management
-- Android file access on desktop
-- open source phone folder app
-- Windows desktop file organizer
-- drag and drop phone files
-- mobile folder management
-- phone directory on desktop
-- file organizer for Android on Windows
+PhoneFolder
 
-## Related Project Type
+desktop file box
+desktop folder organizer
+file storage box
+folder tile
+desktop collection box
+Windows desktop file organizer
+desktop file organizer
+file and folder organizer
+desktop shortcut organizer
+folder entry on desktop
+desktop storage box
+Windows folder tile
+drag and drop file organizer
+phone-style desktop storage
+desktop file management tool
 
-This project fits the category of:
-
-- open-source Windows desktop utility
-- Android file access helper
-- desktop file organizer
-- file management app for phone files
-- lightweight desktop storage portal
-
-## Directory Structure
+## 目录结构 / Directory Structure
 
 ```text
 D:\deskTop\phoneS\
@@ -165,7 +208,7 @@ D:\deskTop\phoneS\
 └─ tests\unit\run.js
 ```
 
-## Known Limitations
+## 已知限制 / Known Limitations
 
 - 未签名 → SmartScreen 首次提示
 - 桌面级瓦片为实验特性：仅主显示器；多显示器 / 混合 DPI 未适配
@@ -173,14 +216,22 @@ D:\deskTop\phoneS\
 - 默认收纳目录在桌面同级；若手动改到桌面中，则会显示在桌面中
 - 托盘「显示/隐藏瓦片」不持久化
 
-## Summary
+- unsigned app → SmartScreen warning on first run
+- desktop tile mode is experimental and mainly for the primary display
+- storage is move-based: items are moved from the desktop into the storage folder
+- default storage folder sits beside the desktop; if moved into the desktop itself it will appear there
+- tray show/hide state is not persisted
 
-PhoneFolder is an open-source desktop utility for creating a Windows phone folder experience, giving users a desktop-side folder for Android content and convenient drag-and-drop file management.
+## 总结 / Summary
 
-It is designed for people who want a practical, lightweight way to organize mobile files from the desktop without replacing the normal Windows file browser.
+PhoneFolder 是一个面向 Windows 桌面的文件收纳工具，它通过一个“像手机文件夹一样”的桌面盒子/瓦片，帮助用户把文件、文件夹和快捷方式收纳到一个统一入口中，形成更简洁、更有序的桌面使用体验。
 
-PhoneFolder – Windows Phone Folder for Desktop
+PhoneFolder is a Windows desktop file organization tool that creates a phone-folder-style desktop box or tile to help users manage files, folders, and shortcuts in one unified entry point and keep the desktop cleaner and more organized.
 
-PhoneFolder – Android file access and organization on Windows
+PhoneFolder – desktop file box
 
-PhoneFolder – open source Windows desktop utility for phone folder management
+PhoneFolder – desktop folder organizer
+
+PhoneFolder – file storage box for Windows
+
+PhoneFolder – phone-style folder tile for desktop organization
