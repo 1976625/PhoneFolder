@@ -10,6 +10,14 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 
 **当前版本：v0.12.1**（便携版已产出）。
 
+## 效果预览
+
+![桌面瓦片（桌面级模式）](docs/images/desktop-tiles.png)
+
+![浮层展开（壁纸模糊 + 毛玻璃网格）](docs/images/overlay-panel.png)
+
+![设置页](docs/images/settings.png)
+
 ## 当前进度
 
 | 阶段 | 状态 | 说明 |
@@ -64,8 +72,7 @@ Windows 桌面「手机文件夹」：桌面上常驻一格瓦片，单击后整
 - 想换成别的位置：右键瓦片 → 设置 → 对应瓦片行「更改」。
 - 旧配置自动迁移（v2/v3 → v4 → v5）：绑定桌面或桌面上旧收纳目录的瓦片会改绑到新收纳目录，旧目录里的文件合并搬过去；v4 → v5 统一 128 尺寸并把坐标吸附到网格。**桌面文件不会被动**，位置/外观保留。
 
-![空瓦片](shots/01-tile.png)
-![空态面板](shots/03-overlay-open.png)
+更多效果图见上方「[效果预览](#效果预览)」。
 
 ## 开发运行
 
@@ -176,7 +183,7 @@ node scripts/e2e-desktop-mode.js  # E2E：桌面级瓦片（Progman 子窗口、
 D:\deskTop\phoneS\
 ├─ package.json / .npmrc / .gitignore / electron-builder.yml
 ├─ assets\                 icon.ico / icon.png（托盘与窗口图标）
-├─ docs\                   开发计划 + P1~P5 + v0.6~v0.12 进展
+├─ docs\                   开发计划 + P1~P5 + v0.6~v0.12 进展；docs\images\ 效果图（README 引用）
 ├─ scripts\                E2E / 诊断 / 截图辅助脚本
 ├─ shots\                  截图产物（gitignore）
 ├─ release\                打包产物（gitignore）
@@ -199,5 +206,6 @@ D:\deskTop\phoneS\
 - 默认收纳目录在桌面同级；若你手动把它改成桌面里的文件夹，它会正常显示在桌面上（这是你的显式选择）
 - 托盘「显示/隐藏瓦片」不持久化；拖出一次只能一个文件（拖到桌面会删掉源文件，拖到其它位置是复制）
 - 网格按主屏 workArea 计算，换分辨率/任务栏位置可在设置里「重新对齐到网格」；瓦片上限 24 个
+
 
 
