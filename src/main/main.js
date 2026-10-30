@@ -16,7 +16,7 @@ const { createSettingsWindow } = require('./windows/settings-window');
 const { scanFolder, applyCustomOrder } = require('./services/folder');
 const { TILE_SIZE, gridMetrics, snapPosition, cellKey, cellOfPosition } = require('./services/grid');
 const { payloadForItem, prefetchShortcutIcons } = require('./services/icons');
-const { bottomWindow, topmostWindow, normalWindow, focusDesktop, watchDesktopState, hwndOf, attachWindow, detachWindow, moveWindow, showWindow, hideWindow, windowHealth } = require('./services/native-window');
+const { bottomWindow, topmostWindow, normalWindow, focusDesktop, watchDesktopState, hwndOf, attachWindow, detachWindow, moveWindow, showWindow, raiseWindow, hideWindow, windowHealth } = require('./services/native-window');
 const { moveIntoFolder } = require('./services/fsops');
 const { sanitizeSettings, settingsSnapshot, cleanTileName } = require('./services/settings');
 const {
@@ -31,6 +31,10 @@ const isShot = argv.includes('--shot') || process.env.PF_SHOT === '1';
 const isHold = argv.includes('--hold');
 const isOpenSettings = argv.includes('--open-settings');
 const isStage = isShot || isHold;
+
+// 桌面级瓦片是 Progman 子窗口，经常被其它窗口遮挡；关闭 Chromium 的原生遮挡检测，
+// 否则它可能认为窗口不可见而停止绘制，出现「瓦片在但内容空白/不显示」。
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 const ROOT = path.join(__dirname, '..', '..');
 // 开发/打包共用同一个 userData 目录（electron-builder 打包后 app 名会变，显式固定）
@@ -320,7 +324,8 @@ let tileWatchTimer = null;
 function startTileWatcher() {
   if (tileWatchTimer) return;
   tileWatchTimer = setInterval(() => {
-    if (quitting || !tilesVisible || !topmostOnShowDesktopEnabled()) return;
+    if (quitting || desktopTileMode()) return; // 桌面级模式由桌面健康检查负责，不能 here 压回底层
+    if (!tilesVisible || !topmostOnShowDesktopEnabled()) return;
     for (const win of tileWindows.values()) {
       if (!win || win.isDestroyed()) continue;
       if (!win.isVisible() || win.isMinimized()) {
@@ -450,8 +455,14 @@ async function refreshDesktopAttachments(reason) {
       log('desktop tile unhealthy, re-attaching:', tileId, JSON.stringify(health), reason || '');
       desktopAttached.delete(tileId);
       await attachTileWindow(win, tile, { force: true });
-      if (tilesVisible) await showWindow(win);
+      if (tilesVisible) {
+        await showWindow(win);
+        await raiseWindow(win);
+      }
+      continue;
     }
+    // 保持 z-order 在 DefView 之上（Explorer 刷新/其它程序可能把子窗口挤到下面）
+    if (tilesVisible) raiseWindow(win).catch(() => {});
   }
 }
 
@@ -521,7 +532,7 @@ function bottomAllTiles() {
 }
 
 async function createTileWindowFor(tile) {
-  const win = createTileWindow(tile, { visible: tilesVisible });
+  const win = createTileWindow(tile, { visible: tilesVisible && !desktopTileMode() });
   tileWindows.set(tile.id, win);
   const shown = new Promise((resolve) => win.once('ready-to-show', resolve));
   win.webContents.once('did-finish-load', () => {
@@ -540,8 +551,11 @@ async function createTileWindowFor(tile) {
           return;
         }
         if (tilesVisible) {
-          win.showInactive();
+          // Electron 内部窗口状态需要是 visible，否则 Chromium 会丢弃鼠标输入；
+          // 再用 native show/raise 修正 z-order（showInactive 可能把子窗口压到底部）。
+          try { win.showInactive(); } catch { /* ignore */ }
           await showWindow(win);
+          await raiseWindow(win);
         } else {
           win.hide();
         }
@@ -636,11 +650,18 @@ function openSettings() {
 
 function toggleTiles() {
   tilesVisible = !tilesVisible;
+  const desktopTasks = [];
   for (const [tileId, win] of tileWindows) {
     if (!win || win.isDestroyed()) continue;
     if (desktopTileMode() && desktopAttached.has(tileId)) {
-      if (tilesVisible) showWindow(win).catch(() => {});
-      else hideWindow(win).catch(() => {});
+      desktopTasks.push((async () => {
+        if (tilesVisible) {
+          await showWindow(win);
+          await raiseWindow(win);
+        } else {
+          await hideWindow(win);
+        }
+      })().catch((err) => log('desktop tile visibility failed:', tileId, err.message)));
       continue;
     }
     if (tilesVisible) {
@@ -652,6 +673,23 @@ function toggleTiles() {
     } else {
       win.hide();
     }
+  }
+  if (desktopTasks.length > 0) {
+    Promise.allSettled(desktopTasks).then(async () => {
+      if (!desktopTileMode() || !tilesVisible) return;
+      await delay(200);
+      // 兜底：再次确认可见 + 置顶（ShowWindow 偶尔会把子窗口压到 z-order 底部）
+      for (const [tileId, win] of tileWindows) {
+        if (!win || win.isDestroyed() || !desktopAttached.has(tileId)) continue;
+        const health = await windowHealth(win);
+        if (!health.alive || !health.visible || !health.parentAlive) {
+          await attachTileWindow(win, tileById(tileId) || { id: tileId }, { force: true });
+        }
+        await showWindow(win);
+        await raiseWindow(win);
+      }
+      log('desktop tiles re-shown:', tileWindows.size);
+    }).catch((err) => log('desktop tiles re-show failed:', err.message));
   }
   log('tiles visibility:', tilesVisible);
 }
@@ -1283,6 +1321,8 @@ app.on('window-all-closed', () => {
 process.on('uncaughtException', (err) => {
   log('uncaught exception:', err && err.stack ? err.stack : String(err));
 });
+
+
 
 
 

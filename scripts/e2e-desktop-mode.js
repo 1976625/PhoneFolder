@@ -75,6 +75,7 @@ Add-Type -Name DP -Namespace PF -MemberDefinition @"
 [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
 [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
 [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
 [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 public delegate bool EnumProc(IntPtr h, IntPtr l);
 "@
@@ -91,19 +92,45 @@ $cb2=[PF.DP+EnumProc]{ param($h,$l)
   }
   $true }
 [PF.DP]::EnumChildWindows($script:progman,$cb2,[IntPtr]::Zero)|Out-Null
+# z-order 枚举：保证所有瓦片子窗口都在 SHELLDLL_DefView（桌面图标层）之上
+$script:zi=0; $script:defIdx=-1; $script:zChildren=@()
+$cb3=[PF.DP+EnumProc]{ param($h,$l)
+  $sb=New-Object System.Text.StringBuilder 256; [PF.DP]::GetClassName($h,$sb,256)|Out-Null
+  $cls=$sb.ToString()
+  if($cls -eq 'SHELLDLL_DefView'){ $script:defIdx=$script:zi }
+  if($cls -eq 'Chrome_WidgetWin_1'){ $script:zChildren += [pscustomobject]@{ hwnd=$h.ToInt64(); z=$script:zi } }
+  $script:zi++
+  $true }
+[PF.DP]::EnumChildWindows($script:progman,$cb3,[IntPtr]::Zero)|Out-Null
 $fg=[PF.DP]::GetForegroundWindow()
 $fsb=New-Object System.Text.StringBuilder 256; [PF.DP]::GetClassName($fg,$fsb,256)|Out-Null
 Write-Output ('PROGMAN=' + $script:progman.ToInt64())
 Write-Output ('FOREGROUND=' + $fsb.ToString())
+Write-Output ('DEFVIEW=' + $script:defIdx)
 foreach($t in $script:tiles){ Write-Output ('TILE ' + ($t | ConvertTo-Json -Compress)) }
+foreach($z in $script:zChildren){ Write-Output ('ZCHILD ' + $z.hwnd + ' ' + $z.z) }
 `;
 
 function probeWindows() {
   const out = ps(PROBE);
   const progman = Number((out.match(/PROGMAN=(-?\d+)/) || [])[1] || 0);
   const foreground = (out.match(/FOREGROUND=(.*)/) || [])[1] || '';
+  const defIdx = Number((out.match(/DEFVIEW=(-?\d+)/) || [])[1] || -1);
   const tiles = out.split(/\r?\n/).filter((line) => line.startsWith('TILE ')).map((line) => JSON.parse(line.slice(5)));
-  return { progman, foreground, tiles };
+  const zChildren = out.split(/\r?\n/).filter((line) => line.startsWith('ZCHILD ')).map((line) => {
+    const parts = line.split(/\s+/);
+    return { hwnd: Number(parts[1]), z: Number(parts[2]) };
+  });
+  return { progman, foreground, defIdx, tiles, zChildren };
+}
+
+function assertTilesAboveDefView(probe, label) {
+  if (probe.defIdx < 0) throw new Error(`${label}: 找不到 SHELLDLL_DefView`);
+  for (const tile of probe.tiles) {
+    const zt = probe.zChildren.find((entry) => entry.hwnd === tile.hwnd);
+    if (!zt) throw new Error(`${label}: 瓦片 ${tile.hwnd} 不在 Progman 子窗口里`);
+    if (zt.z > probe.defIdx) throw new Error(`${label}: 瓦片 ${tile.hwnd} 被压到桌面图标层下面（z=${zt.z}, DefView=${probe.defIdx}）`);
+  }
 }
 
 async function winD() {
@@ -124,6 +151,16 @@ Start-Sleep -Milliseconds 70
 
 function clickAt(x, y) {
   execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'mouse-click.ps1'), '-X', String(x), '-Y', String(y)], { windowsHide: true });
+}
+
+// 把瓦片子窗口强制压到 Progman 子窗口 z-order 最底部，模拟「Explorer/其它程序把它挤下去」
+function pushTileToBottom(hwnd) {
+  ps(`
+Add-Type -Name PMB -Namespace PZ -MemberDefinition @"
+[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+"@
+[PZ.PMB]::SetWindowPos([IntPtr]${hwnd}, [IntPtr]1, 0, 0, 0, 0, 0x0003 -bor 0x0010) | Out-Null
+`);
 }
 
 (async () => {
@@ -153,6 +190,8 @@ function clickAt(x, y) {
       throw new Error(`期望 ${tileCount} 个子窗口，实际 ${attached.length}（progman=${probe1.progman}）`);
     }
     console.log('attached children:', attached.length);
+    assertTilesAboveDefView(probe1, '启动后');
+    console.log('z-order above DefView: ok');
 
     // 2. Win+D 不被收起
     await winD();
@@ -160,10 +199,18 @@ function clickAt(x, y) {
     const visibleAfter = probe2.tiles.filter((t) => t.parent === probe1.progman && t.child && t.visible);
     console.log('after Win+D visible:', visibleAfter.length, 'foreground:', probe2.foreground);
     if (visibleAfter.length !== tileCount) throw new Error(`Win+D 后仍有 ${tileCount - visibleAfter.length} 个瓦片不可见`);
-    await winD(); // 恢复
-    await delay(600);
+    assertTilesAboveDefView(probeWindows(), 'Win+D 后');
 
-    // 3. 点击瓦片 → 打开浮层
+    // 2.5 z-order 自愈：故意压到底部，健康检查应把它重新置顶（修复「有的瓦片不显示」）
+    pushTileToBottom(attached[0].hwnd);
+    const probePushed = probeWindows();
+    const pushedZ = probePushed.zChildren.find((entry) => entry.hwnd === attached[0].hwnd);
+    if (pushedZ && pushedZ.z < probePushed.defIdx) throw new Error('测试前置失败：瓦片没有被压到 DefView 下面');
+    await delay(4000);
+    assertTilesAboveDefView(probeWindows(), 'z-order 自愈后');
+    console.log('z-order self-heal: ok');
+
+    // 3. 点击瓦片 → 打开浮层（此时桌面处于显示状态，点击才落在瓦片上）
     const targetTile = attached.slice().sort((a, b) => a.top - b.top)[0];
     const cx = Math.round((targetTile.left + targetTile.right) / 2);
     const cy = Math.round((targetTile.top + targetTile.bottom) / 2);
@@ -178,6 +225,11 @@ function clickAt(x, y) {
     console.log('click opens overlay: ok');
     clickAt(130, 130); // 点面板外收起
     await delay(900);
+
+    // 4. 恢复软件窗口（再次 Win+D），再测拖动
+    await winD();
+    await delay(1200);
+    assertTilesAboveDefView(probeWindows(), '恢复窗口后');
 
     // 4. 拖动落格（用 tile 页面的 dragStart/dragMove/dragEnd 驱动主进程逻辑）
     const beforeCfg = readConfig();

@@ -32,6 +32,7 @@ public struct RECT { public int Left; public int Top; public int Right; public i
 [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int index);
 [DllImport("user32.dll")] public static extern int SetWindowLong(IntPtr h, int index, int value);
 [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT rect);
+[DllImport("user32.dll")] public static extern bool RedrawWindow(IntPtr h, IntPtr rect, IntPtr region, uint flags);
 [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr extra);
 public delegate bool EnumProc(IntPtr h, IntPtr extra);
@@ -135,6 +136,7 @@ while ($true) {
       [PhoneFolder.PFNative]::SetWindowLong($h, $GWL_STYLE, [int]$newStyle) | Out-Null
       [PhoneFolder.PFNative]::SetParent($h, $parent) | Out-Null
       [PhoneFolder.PFNative]::SetWindowPos($h, [IntPtr]::Zero, $x, $y, $w, $hh, 0x0010 -bor 0x0020 -bor 0x0040) | Out-Null
+      [PhoneFolder.PFNative]::RedrawWindow($h, [IntPtr]::Zero, [IntPtr]::Zero, 0x0181) | Out-Null
       Reply $id ('ok attach ' + $parent.ToInt64().ToString())
     } catch { Reply $id ('fail attach ' + $_.Exception.Message) }
     continue
@@ -165,7 +167,24 @@ while ($true) {
     continue
   }
   if ($cmd -eq 'show') {
-    try { [PhoneFolder.PFNative]::ShowWindow([IntPtr][long]$parts[1], 5) | Out-Null; Reply $id 'ok show' } catch { Reply $id 'fail show' }
+    try {
+      $h = [IntPtr][long]$parts[1]
+      [PhoneFolder.PFNative]::ShowWindow($h, 5) | Out-Null
+      # ShowWindow 可能把子窗口压到 z-order 底部（会掉到桌面图标/壁纸层下面），必须重新置顶
+      [PhoneFolder.PFNative]::SetWindowPos($h, [IntPtr]::Zero, 0, 0, 0, 0, 0x0001 -bor 0x0002 -bor 0x0010 -bor 0x0040) | Out-Null
+      [PhoneFolder.PFNative]::RedrawWindow($h, [IntPtr]::Zero, [IntPtr]::Zero, 0x0181) | Out-Null
+      Reply $id 'ok show'
+    } catch { Reply $id 'fail show' }
+    continue
+  }
+  if ($cmd -eq 'raise') {
+    try {
+      $h = [IntPtr][long]$parts[1]
+      [PhoneFolder.PFNative]::ShowWindow($h, 5) | Out-Null
+      [PhoneFolder.PFNative]::SetWindowPos($h, [IntPtr]::Zero, 0, 0, 0, 0, 0x0001 -bor 0x0002 -bor 0x0010 -bor 0x0040) | Out-Null
+      [PhoneFolder.PFNative]::RedrawWindow($h, [IntPtr]::Zero, [IntPtr]::Zero, 0x0181) | Out-Null
+      Reply $id 'ok raise'
+    } catch { Reply $id 'fail raise' }
     continue
   }
   if ($cmd -eq 'hide') {
@@ -381,6 +400,13 @@ async function showWindow(win) {
   if (hwnd) await request(`show ${hwnd}`);
 }
 
+// 子窗口的 ShowWindow 可能把它压到 z-order 底部（掉到桌面图标/壁纸层下面），
+// 这里统一「显示 + 置顶 + 重绘」，保证桌面级瓦片一直在 DefView 之上。
+async function raiseWindow(win) {
+  const hwnd = win && !win.isDestroyed() ? hwndOf(win) : null;
+  if (hwnd) await request(`raise ${hwnd}`);
+}
+
 async function hideWindow(win) {
   const hwnd = win && !win.isDestroyed() ? hwndOf(win) : null;
   if (hwnd) await request(`hide ${hwnd}`);
@@ -452,6 +478,7 @@ module.exports = {
   detachWindow,
   moveWindow,
   showWindow,
+  raiseWindow,
   hideWindow,
   windowBounds,
   windowHealth,
